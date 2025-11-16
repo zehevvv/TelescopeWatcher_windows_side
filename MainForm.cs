@@ -6,6 +6,7 @@ namespace TelescopeWatcher
     {
         private SerialPort? serialPort;
         private string? selectedPort;
+        private TelescopeControlForm? telescopeControlForm;
 
         public MainForm()
         {
@@ -72,7 +73,7 @@ namespace TelescopeWatcher
             {
                 serialPort = new SerialPort(portName)
                 {
-                    BaudRate = 9600,
+                    BaudRate = 115200,
                     Parity = Parity.None,
                     DataBits = 8,
                     StopBits = StopBits.One,
@@ -92,6 +93,9 @@ namespace TelescopeWatcher
                 btnDisconnect.Enabled = true;
                 btnRefresh.Enabled = false;
                 listBoxPorts.Enabled = false;
+
+                // Open telescope control window
+                OpenTelescopeControl();
             }
             catch (Exception ex)
             {
@@ -101,8 +105,25 @@ namespace TelescopeWatcher
             }
         }
 
+        private void OpenTelescopeControl()
+        {
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                telescopeControlForm = new TelescopeControlForm(serialPort, selectedPort!);
+                telescopeControlForm.Show();
+                AddStatusMessage("Telescope control window opened.");
+            }
+        }
+
         private void DisconnectFromPort()
         {
+            // Close telescope control window if open
+            if (telescopeControlForm != null && !telescopeControlForm.IsDisposed)
+            {
+                telescopeControlForm.Close();
+                telescopeControlForm = null;
+            }
+
             if (serialPort != null && serialPort.IsOpen)
             {
                 try
