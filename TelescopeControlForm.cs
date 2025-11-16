@@ -8,6 +8,7 @@ namespace TelescopeWatcher
         private string portName;
         private System.Windows.Forms.Timer commandTimer;
         private string currentDirection = "";
+        private bool isKeyPressed = false;
 
         public TelescopeControlForm(SerialPort port, string portName)
         {
@@ -15,6 +16,9 @@ namespace TelescopeWatcher
             this.serialPort = port;
             this.portName = portName;
             lblPortInfo.Text = $"Connected: {portName} @ {port.BaudRate} baud";
+            
+            // Enable key preview to capture keyboard events
+            this.KeyPreview = true;
             
             // Initialize timer for continuous commands
             commandTimer = new System.Windows.Forms.Timer();
@@ -26,6 +30,49 @@ namespace TelescopeWatcher
             btnUp.MouseUp += BtnUp_MouseUp;
             btnDown.MouseDown += BtnDown_MouseDown;
             btnDown.MouseUp += BtnDown_MouseUp;
+            
+            // Wire up keyboard events
+            this.KeyDown += TelescopeControlForm_KeyDown;
+            this.KeyUp += TelescopeControlForm_KeyUp;
+        }
+
+        private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)
+        {
+            // Prevent auto-repeat of KeyDown events
+            if (isKeyPressed)
+                return;
+
+            if (e.KeyCode == Keys.Up)
+            {
+                isKeyPressed = true;
+                currentDirection = "UP";
+                SendTelescopeCommand("UP");
+                commandTimer.Start();
+                e.Handled = true;
+                AddLogMessage("UP arrow key pressed");
+            }
+            else if (e.KeyCode == Keys.Down)
+            {
+                isKeyPressed = true;
+                currentDirection = "DOWN";
+                SendTelescopeCommand("DOWN");
+                commandTimer.Start();
+                e.Handled = true;
+                AddLogMessage("DOWN arrow key pressed");
+            }
+        }
+
+        private void TelescopeControlForm_KeyUp(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down)
+            {
+                isKeyPressed = false;
+                commandTimer.Stop();
+                SendStopCommand();
+                AddLogMessage($"{(e.KeyCode == Keys.Up ? "UP" : "DOWN")} arrow key released - stopped sending commands");
+                currentDirection = "";
+                e.Handled = true;
+            }
         }
 
         private void BtnUp_MouseDown(object? sender, MouseEventArgs e)
@@ -38,6 +85,7 @@ namespace TelescopeWatcher
         private void BtnUp_MouseUp(object? sender, MouseEventArgs e)
         {
             commandTimer.Stop();
+            SendStopCommand();
             currentDirection = "";
             AddLogMessage("UP button released - stopped sending commands");
         }
@@ -52,6 +100,7 @@ namespace TelescopeWatcher
         private void BtnDown_MouseUp(object? sender, MouseEventArgs e)
         {
             commandTimer.Stop();
+            SendStopCommand();
             currentDirection = "";
             AddLogMessage("DOWN button released - stopped sending commands");
         }
@@ -134,6 +183,26 @@ namespace TelescopeWatcher
             {
                 AddLogMessage($"Error sending command: {ex.Message}");
                 commandTimer.Stop();
+            }
+        }
+
+        private void SendStopCommand()
+        {
+            if (serialPort == null || !serialPort.IsOpen)
+            {
+                return;
+            }
+
+            try
+            {
+                // Send stop command
+                string stopCommand = "s=0";
+                serialPort.WriteLine(stopCommand);
+                AddLogMessage("Sending: s=0 (STOP)");
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error sending stop command: {ex.Message}");
             }
         }
 
