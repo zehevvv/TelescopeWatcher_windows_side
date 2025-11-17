@@ -9,6 +9,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Timer commandTimer;
         private string currentDirection = "";
         private bool isKeyPressed = false;
+        private int timeBetweenSteps = 5000; // Default 5000ms
 
         public TelescopeControlForm(SerialPort port, string portName)
         {
@@ -34,6 +35,54 @@ namespace TelescopeWatcher
             // Wire up keyboard events
             this.KeyDown += TelescopeControlForm_KeyDown;
             this.KeyUp += TelescopeControlForm_KeyUp;
+            
+            // Set default time value
+            txtCustomTime.Text = timeBetweenSteps.ToString();
+        }
+
+        private void radio5000_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (radio5000.Checked)
+            {
+                timeBetweenSteps = 5000;
+                txtCustomTime.Text = "5000";
+                AddLogMessage("Time between steps set to 5000ms");
+            }
+        }
+
+        private void radio10000_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (radio10000.Checked)
+            {
+                timeBetweenSteps = 10000;
+                txtCustomTime.Text = "10000";
+                AddLogMessage("Time between steps set to 10000ms");
+            }
+        }
+
+        private void radio15000_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (radio15000.Checked)
+            {
+                timeBetweenSteps = 15000;
+                txtCustomTime.Text = "15000";
+                AddLogMessage("Time between steps set to 15000ms");
+            }
+        }
+
+        private void txtCustomTime_TextChanged(object? sender, EventArgs e)
+        {
+            if (int.TryParse(txtCustomTime.Text, out int customTime))
+            {
+                if (customTime > 0)
+                {
+                    timeBetweenSteps = customTime;
+                    // Uncheck all radio buttons when custom value is entered
+                    radio5000.Checked = false;
+                    radio10000.Checked = false;
+                    radio15000.Checked = false;
+                }
+            }
         }
 
         private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)
@@ -149,6 +198,12 @@ namespace TelescopeWatcher
 
                 // Send direction command (only once when button first pressed)
                 serialPort.WriteLine(directionCommand);
+                Thread.Sleep(50); // Small delay between commands
+
+                // Send time between steps command
+                string timeCommand = $"t={timeBetweenSteps}";
+                serialPort.WriteLine(timeCommand);
+                AddLogMessage($"Sending: t={timeBetweenSteps} (Time: {timeBetweenSteps}ms)");
                 Thread.Sleep(50); // Small delay between commands
 
                 // Send steps command
