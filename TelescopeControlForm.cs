@@ -98,6 +98,7 @@ namespace TelescopeWatcher
                 SendTelescopeCommand("UP");
                 commandTimer.Start();
                 e.Handled = true;
+                e.SuppressKeyPress = true; // Prevent default arrow key behavior
                 AddLogMessage("UP arrow key pressed");
             }
             else if (e.KeyCode == Keys.Down)
@@ -107,6 +108,7 @@ namespace TelescopeWatcher
                 SendTelescopeCommand("DOWN");
                 commandTimer.Start();
                 e.Handled = true;
+                e.SuppressKeyPress = true; // Prevent default arrow key behavior
                 AddLogMessage("DOWN arrow key pressed");
             }
         }
