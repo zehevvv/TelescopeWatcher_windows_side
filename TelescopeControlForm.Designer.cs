@@ -30,6 +30,8 @@ namespace TelescopeWatcher
         {
             this.btnUp = new System.Windows.Forms.Button();
             this.btnDown = new System.Windows.Forms.Button();
+            this.btnLeft = new System.Windows.Forms.Button();
+            this.btnRight = new System.Windows.Forms.Button();
             this.txtLog = new System.Windows.Forms.TextBox();
             this.lblControl = new System.Windows.Forms.Label();
             this.lblStatus = new System.Windows.Forms.Label();
@@ -46,9 +48,9 @@ namespace TelescopeWatcher
             // btnUp
             // 
             this.btnUp.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.btnUp.Location = new System.Drawing.Point(320, 60);
+            this.btnUp.Location = new System.Drawing.Point(390, 60);
             this.btnUp.Name = "btnUp";
-            this.btnUp.Size = new System.Drawing.Size(120, 60);
+            this.btnUp.Size = new System.Drawing.Size(80, 60);
             this.btnUp.TabIndex = 0;
             this.btnUp.Text = "? UP";
             this.btnUp.UseVisualStyleBackColor = true;
@@ -57,13 +59,35 @@ namespace TelescopeWatcher
             // btnDown
             // 
             this.btnDown.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.btnDown.Location = new System.Drawing.Point(320, 130);
+            this.btnDown.Location = new System.Drawing.Point(390, 130);
             this.btnDown.Name = "btnDown";
-            this.btnDown.Size = new System.Drawing.Size(120, 60);
+            this.btnDown.Size = new System.Drawing.Size(80, 60);
             this.btnDown.TabIndex = 1;
             this.btnDown.Text = "? DOWN";
             this.btnDown.UseVisualStyleBackColor = true;
             this.btnDown.Click += new System.EventHandler(this.btnDown_Click);
+            // 
+            // btnLeft
+            // 
+            this.btnLeft.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
+            this.btnLeft.Location = new System.Drawing.Point(500, 60);
+            this.btnLeft.Name = "btnLeft";
+            this.btnLeft.Size = new System.Drawing.Size(80, 60);
+            this.btnLeft.TabIndex = 7;
+            this.btnLeft.Text = "? LEFT";
+            this.btnLeft.UseVisualStyleBackColor = true;
+            this.btnLeft.Click += new System.EventHandler(this.btnLeft_Click);
+            // 
+            // btnRight
+            // 
+            this.btnRight.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
+            this.btnRight.Location = new System.Drawing.Point(500, 130);
+            this.btnRight.Name = "btnRight";
+            this.btnRight.Size = new System.Drawing.Size(80, 60);
+            this.btnRight.TabIndex = 8;
+            this.btnRight.Text = "? RIGHT";
+            this.btnRight.UseVisualStyleBackColor = true;
+            this.btnRight.Click += new System.EventHandler(this.btnRight_Click);
             // 
             // txtLog
             // 
@@ -72,14 +96,14 @@ namespace TelescopeWatcher
             this.txtLog.Name = "txtLog";
             this.txtLog.ReadOnly = true;
             this.txtLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtLog.Size = new System.Drawing.Size(440, 150);
+            this.txtLog.Size = new System.Drawing.Size(580, 150);
             this.txtLog.TabIndex = 2;
             // 
             // lblControl
             // 
             this.lblControl.AutoSize = true;
             this.lblControl.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.lblControl.Location = new System.Drawing.Point(160, 20);
+            this.lblControl.Location = new System.Drawing.Point(220, 20);
             this.lblControl.Name = "lblControl";
             this.lblControl.Size = new System.Drawing.Size(160, 21);
             this.lblControl.TabIndex = 3;
@@ -113,7 +137,7 @@ namespace TelescopeWatcher
             this.grpTimeBetweenSteps.Controls.Add(this.radio5000);
             this.grpTimeBetweenSteps.Location = new System.Drawing.Point(12, 55);
             this.grpTimeBetweenSteps.Name = "grpTimeBetweenSteps";
-            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(290, 145);
+            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(360, 145);
             this.grpTimeBetweenSteps.TabIndex = 6;
             this.grpTimeBetweenSteps.TabStop = false;
             this.grpTimeBetweenSteps.Text = "Time Between Steps";
@@ -141,7 +165,7 @@ namespace TelescopeWatcher
             this.radio15000.AutoSize = true;
             this.radio15000.Location = new System.Drawing.Point(15, 80);
             this.radio15000.Name = "radio15000";
-            this.radio15000.Size = new System.Drawing.Size(94, 19);
+            this.radio15000.Size = new System.Drawing.Size(104, 19);
             this.radio15000.TabIndex = 2;
             this.radio15000.Text = "15000 ms (15s)";
             this.radio15000.UseVisualStyleBackColor = true;
@@ -152,7 +176,7 @@ namespace TelescopeWatcher
             this.radio10000.AutoSize = true;
             this.radio10000.Location = new System.Drawing.Point(15, 55);
             this.radio10000.Name = "radio10000";
-            this.radio10000.Size = new System.Drawing.Size(94, 19);
+            this.radio10000.Size = new System.Drawing.Size(104, 19);
             this.radio10000.TabIndex = 1;
             this.radio10000.Text = "10000 ms (10s)";
             this.radio10000.UseVisualStyleBackColor = true;
@@ -164,7 +188,7 @@ namespace TelescopeWatcher
             this.radio5000.Checked = true;
             this.radio5000.Location = new System.Drawing.Point(15, 30);
             this.radio5000.Name = "radio5000";
-            this.radio5000.Size = new System.Drawing.Size(85, 19);
+            this.radio5000.Size = new System.Drawing.Size(94, 19);
             this.radio5000.TabIndex = 0;
             this.radio5000.TabStop = true;
             this.radio5000.Text = "5000 ms (5s)";
@@ -175,7 +199,9 @@ namespace TelescopeWatcher
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(464, 411);
+            this.ClientSize = new System.Drawing.Size(604, 411);
+            this.Controls.Add(this.btnRight);
+            this.Controls.Add(this.btnLeft);
             this.Controls.Add(this.grpTimeBetweenSteps);
             this.Controls.Add(this.lblPortInfo);
             this.Controls.Add(this.lblStatus);
@@ -199,6 +225,8 @@ namespace TelescopeWatcher
 
         private System.Windows.Forms.Button btnUp;
         private System.Windows.Forms.Button btnDown;
+        private System.Windows.Forms.Button btnLeft;
+        private System.Windows.Forms.Button btnRight;
         private System.Windows.Forms.TextBox txtLog;
         private System.Windows.Forms.Label lblControl;
         private System.Windows.Forms.Label lblStatus;

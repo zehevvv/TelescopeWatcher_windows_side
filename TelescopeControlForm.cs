@@ -31,6 +31,10 @@ namespace TelescopeWatcher
             btnUp.MouseUp += BtnUp_MouseUp;
             btnDown.MouseDown += BtnDown_MouseDown;
             btnDown.MouseUp += BtnDown_MouseUp;
+            btnLeft.MouseDown += BtnLeft_MouseDown;
+            btnLeft.MouseUp += BtnLeft_MouseUp;
+            btnRight.MouseDown += BtnRight_MouseDown;
+            btnRight.MouseUp += BtnRight_MouseUp;
             
             // Wire up keyboard events
             this.KeyDown += TelescopeControlForm_KeyDown;
@@ -111,16 +115,39 @@ namespace TelescopeWatcher
                 e.SuppressKeyPress = true; // Prevent default arrow key behavior
                 AddLogMessage("DOWN arrow key pressed");
             }
+            else if (e.KeyCode == Keys.Left)
+            {
+                isKeyPressed = true;
+                currentDirection = "LEFT";
+                SendTelescopeCommand("LEFT");
+                commandTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true; // Prevent default arrow key behavior
+                AddLogMessage("LEFT arrow key pressed");
+            }
+            else if (e.KeyCode == Keys.Right)
+            {
+                isKeyPressed = true;
+                currentDirection = "RIGHT";
+                SendTelescopeCommand("RIGHT");
+                commandTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true; // Prevent default arrow key behavior
+                AddLogMessage("RIGHT arrow key pressed");
+            }
         }
 
         private void TelescopeControlForm_KeyUp(object? sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down)
+            if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right)
             {
                 isKeyPressed = false;
                 commandTimer.Stop();
                 SendStopCommand();
-                AddLogMessage($"{(e.KeyCode == Keys.Up ? "UP" : "DOWN")} arrow key released - stopped sending commands");
+                string keyName = e.KeyCode == Keys.Up ? "UP" : 
+                                 e.KeyCode == Keys.Down ? "DOWN" : 
+                                 e.KeyCode == Keys.Left ? "LEFT" : "RIGHT";
+                AddLogMessage($"{keyName} arrow key released - stopped sending commands");
                 currentDirection = "";
                 e.Handled = true;
             }
@@ -156,6 +183,36 @@ namespace TelescopeWatcher
             AddLogMessage("DOWN button released - stopped sending commands");
         }
 
+        private void BtnLeft_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentDirection = "LEFT";
+            SendTelescopeCommand("LEFT");
+            commandTimer.Start();
+        }
+
+        private void BtnLeft_MouseUp(object? sender, MouseEventArgs e)
+        {
+            commandTimer.Stop();
+            SendStopCommand();
+            currentDirection = "";
+            AddLogMessage("LEFT button released - stopped sending commands");
+        }
+
+        private void BtnRight_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentDirection = "RIGHT";
+            SendTelescopeCommand("RIGHT");
+            commandTimer.Start();
+        }
+
+        private void BtnRight_MouseUp(object? sender, MouseEventArgs e)
+        {
+            commandTimer.Stop();
+            SendStopCommand();
+            currentDirection = "";
+            AddLogMessage("RIGHT button released - stopped sending commands");
+        }
+
         private void CommandTimer_Tick(object? sender, EventArgs e)
         {
             if (!string.IsNullOrEmpty(currentDirection))
@@ -174,6 +231,16 @@ namespace TelescopeWatcher
             // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
         }
 
+        private void btnLeft_Click(object sender, EventArgs e)
+        {
+            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
+        }
+
+        private void btnRight_Click(object sender, EventArgs e)
+        {
+            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
+        }
+
         private void SendTelescopeCommand(string direction)
         {
             if (serialPort == null || !serialPort.IsOpen)
@@ -186,19 +253,48 @@ namespace TelescopeWatcher
 
             try
             {
+                string motorCommand;
                 string directionCommand;
+                
+                // Determine motor selection and direction based on command
                 if (direction == "UP")
                 {
+                    motorCommand = "v=0"; // Up/Down motor
                     directionCommand = "d=1";
+                    AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
+                    serialPort.WriteLine(motorCommand);
+                    Thread.Sleep(50);
                     AddLogMessage("Sending: d=1 (Direction: UP)");
                 }
-                else // DOWN
+                else if (direction == "DOWN")
                 {
+                    motorCommand = "v=0"; // Up/Down motor
                     directionCommand = "d=0";
+                    AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
+                    serialPort.WriteLine(motorCommand);
+                    Thread.Sleep(50);
                     AddLogMessage("Sending: d=0 (Direction: DOWN)");
                 }
+                else if (direction == "LEFT")
+                {
+                    motorCommand = "v=1"; // Left/Right motor
+                    directionCommand = "d=0";
+                    AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
+                    serialPort.WriteLine(motorCommand);
+                    Thread.Sleep(50);
+                    AddLogMessage("Sending: d=0 (Direction: LEFT)");
+                }
+                else // RIGHT
+                {
+                    motorCommand = "v=1"; // Left/Right motor
+                    directionCommand = "d=1";
+                    AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
+                    serialPort.WriteLine(motorCommand);
+                    Thread.Sleep(50);
+                    AddLogMessage("Sending: d=1 (Direction: RIGHT)");
+                }
 
-                // Send direction command (only once when button first pressed)
+                // Send direction command
                 serialPort.WriteLine(directionCommand);
                 Thread.Sleep(50); // Small delay between commands
 
