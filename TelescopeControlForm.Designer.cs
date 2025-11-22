@@ -47,46 +47,62 @@ namespace TelescopeWatcher
             // 
             // btnUp
             // 
-            this.btnUp.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.btnUp.Location = new System.Drawing.Point(390, 60);
+            this.btnUp.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.btnUp.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnUp.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
+            this.btnUp.FlatAppearance.BorderSize = 2;
+            this.btnUp.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
+            this.btnUp.Location = new System.Drawing.Point(450, 60);
             this.btnUp.Name = "btnUp";
-            this.btnUp.Size = new System.Drawing.Size(80, 60);
+            this.btnUp.Size = new System.Drawing.Size(60, 50);
             this.btnUp.TabIndex = 0;
-            this.btnUp.Text = "? UP";
-            this.btnUp.UseVisualStyleBackColor = true;
+            this.btnUp.Text = "UP";
+            this.btnUp.UseVisualStyleBackColor = false;
             this.btnUp.Click += new System.EventHandler(this.btnUp_Click);
             // 
             // btnDown
             // 
-            this.btnDown.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.btnDown.Location = new System.Drawing.Point(390, 130);
+            this.btnDown.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.btnDown.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnDown.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
+            this.btnDown.FlatAppearance.BorderSize = 2;
+            this.btnDown.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.btnDown.Location = new System.Drawing.Point(450, 115);
             this.btnDown.Name = "btnDown";
-            this.btnDown.Size = new System.Drawing.Size(80, 60);
+            this.btnDown.Size = new System.Drawing.Size(60, 50);
             this.btnDown.TabIndex = 1;
-            this.btnDown.Text = "? DOWN";
-            this.btnDown.UseVisualStyleBackColor = true;
+            this.btnDown.Text = "DOWN";
+            this.btnDown.UseVisualStyleBackColor = false;
             this.btnDown.Click += new System.EventHandler(this.btnDown_Click);
             // 
             // btnLeft
             // 
-            this.btnLeft.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.btnLeft.Location = new System.Drawing.Point(500, 60);
+            this.btnLeft.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.btnLeft.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnLeft.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
+            this.btnLeft.FlatAppearance.BorderSize = 2;
+            this.btnLeft.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.btnLeft.Location = new System.Drawing.Point(385, 115);
             this.btnLeft.Name = "btnLeft";
-            this.btnLeft.Size = new System.Drawing.Size(80, 60);
+            this.btnLeft.Size = new System.Drawing.Size(60, 50);
             this.btnLeft.TabIndex = 7;
-            this.btnLeft.Text = "? LEFT";
-            this.btnLeft.UseVisualStyleBackColor = true;
+            this.btnLeft.Text = "LEFT";
+            this.btnLeft.UseVisualStyleBackColor = false;
             this.btnLeft.Click += new System.EventHandler(this.btnLeft_Click);
             // 
             // btnRight
             // 
-            this.btnRight.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold);
-            this.btnRight.Location = new System.Drawing.Point(500, 130);
+            this.btnRight.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.btnRight.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnRight.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
+            this.btnRight.FlatAppearance.BorderSize = 2;
+            this.btnRight.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnRight.Location = new System.Drawing.Point(515, 115);
             this.btnRight.Name = "btnRight";
-            this.btnRight.Size = new System.Drawing.Size(80, 60);
+            this.btnRight.Size = new System.Drawing.Size(60, 50);
             this.btnRight.TabIndex = 8;
-            this.btnRight.Text = "? RIGHT";
-            this.btnRight.UseVisualStyleBackColor = true;
+            this.btnRight.Text = "RIGHT";
+            this.btnRight.UseVisualStyleBackColor = false;
             this.btnRight.Click += new System.EventHandler(this.btnRight_Click);
             // 
             // txtLog
@@ -170,7 +186,7 @@ namespace TelescopeWatcher
             this.trackBarStepsPerSecond.Name = "trackBarStepsPerSecond";
             this.trackBarStepsPerSecond.Size = new System.Drawing.Size(330, 45);
             this.trackBarStepsPerSecond.TabIndex = 1;
-            this.trackBarStepsPerSecond.Value = 2;
+            this.trackBarStepsPerSecond.Value = 4;
             this.trackBarStepsPerSecond.Scroll += new System.EventHandler(this.trackBarStepsPerSecond_Scroll);
             // 
             // lblStepsPerSecond
