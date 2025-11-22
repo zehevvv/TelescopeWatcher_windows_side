@@ -37,9 +37,12 @@ namespace TelescopeWatcher
             this.lblStatus = new System.Windows.Forms.Label();
             this.lblPortInfo = new System.Windows.Forms.Label();
             this.grpTimeBetweenSteps = new System.Windows.Forms.GroupBox();
-            this.txtCustomTime = new System.Windows.Forms.TextBox();
-            this.lblCustomTime = new System.Windows.Forms.Label();
+            this.lblStepsPerSecondValue = new System.Windows.Forms.Label();
+            this.lblTimeValue = new System.Windows.Forms.Label();
+            this.trackBarStepsPerSecond = new System.Windows.Forms.TrackBar();
+            this.lblStepsPerSecond = new System.Windows.Forms.Label();
             this.grpTimeBetweenSteps.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarStepsPerSecond)).BeginInit();
             this.SuspendLayout();
             // 
             // btnUp
@@ -127,32 +130,57 @@ namespace TelescopeWatcher
             // 
             // grpTimeBetweenSteps
             // 
-            this.grpTimeBetweenSteps.Controls.Add(this.txtCustomTime);
-            this.grpTimeBetweenSteps.Controls.Add(this.lblCustomTime);
+            this.grpTimeBetweenSteps.Controls.Add(this.lblStepsPerSecondValue);
+            this.grpTimeBetweenSteps.Controls.Add(this.lblTimeValue);
+            this.grpTimeBetweenSteps.Controls.Add(this.trackBarStepsPerSecond);
+            this.grpTimeBetweenSteps.Controls.Add(this.lblStepsPerSecond);
             this.grpTimeBetweenSteps.Location = new System.Drawing.Point(12, 55);
             this.grpTimeBetweenSteps.Name = "grpTimeBetweenSteps";
-            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(360, 70);
+            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(360, 145);
             this.grpTimeBetweenSteps.TabIndex = 6;
             this.grpTimeBetweenSteps.TabStop = false;
-            this.grpTimeBetweenSteps.Text = "Time Between Steps";
+            this.grpTimeBetweenSteps.Text = "Speed Control";
             // 
-            // txtCustomTime
+            // lblStepsPerSecondValue
             // 
-            this.txtCustomTime.Location = new System.Drawing.Point(100, 30);
-            this.txtCustomTime.Name = "txtCustomTime";
-            this.txtCustomTime.Size = new System.Drawing.Size(80, 23);
-            this.txtCustomTime.TabIndex = 4;
-            this.txtCustomTime.Text = "20";
-            this.txtCustomTime.TextChanged += new System.EventHandler(this.txtCustomTime_TextChanged);
+            this.lblStepsPerSecondValue.AutoSize = true;
+            this.lblStepsPerSecondValue.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblStepsPerSecondValue.Location = new System.Drawing.Point(15, 105);
+            this.lblStepsPerSecondValue.Name = "lblStepsPerSecondValue";
+            this.lblStepsPerSecondValue.Size = new System.Drawing.Size(140, 19);
+            this.lblStepsPerSecondValue.TabIndex = 3;
+            this.lblStepsPerSecondValue.Text = "100 steps/second";
             // 
-            // lblCustomTime
+            // lblTimeValue
             // 
-            this.lblCustomTime.AutoSize = true;
-            this.lblCustomTime.Location = new System.Drawing.Point(15, 33);
-            this.lblCustomTime.Name = "lblCustomTime";
-            this.lblCustomTime.Size = new System.Drawing.Size(52, 15);
-            this.lblCustomTime.TabIndex = 3;
-            this.lblCustomTime.Text = "Time (ms):";
+            this.lblTimeValue.AutoSize = true;
+            this.lblTimeValue.ForeColor = System.Drawing.Color.Gray;
+            this.lblTimeValue.Location = new System.Drawing.Point(180, 107);
+            this.lblTimeValue.Name = "lblTimeValue";
+            this.lblTimeValue.Size = new System.Drawing.Size(50, 15);
+            this.lblTimeValue.TabIndex = 2;
+            this.lblTimeValue.Text = "(t=10 ms)";
+            // 
+            // trackBarStepsPerSecond
+            // 
+            this.trackBarStepsPerSecond.LargeChange = 1;
+            this.trackBarStepsPerSecond.Location = new System.Drawing.Point(15, 50);
+            this.trackBarStepsPerSecond.Maximum = 5;
+            this.trackBarStepsPerSecond.Minimum = 0;
+            this.trackBarStepsPerSecond.Name = "trackBarStepsPerSecond";
+            this.trackBarStepsPerSecond.Size = new System.Drawing.Size(330, 45);
+            this.trackBarStepsPerSecond.TabIndex = 1;
+            this.trackBarStepsPerSecond.Value = 2;
+            this.trackBarStepsPerSecond.Scroll += new System.EventHandler(this.trackBarStepsPerSecond_Scroll);
+            // 
+            // lblStepsPerSecond
+            // 
+            this.lblStepsPerSecond.AutoSize = true;
+            this.lblStepsPerSecond.Location = new System.Drawing.Point(15, 25);
+            this.lblStepsPerSecond.Name = "lblStepsPerSecond";
+            this.lblStepsPerSecond.Size = new System.Drawing.Size(105, 15);
+            this.lblStepsPerSecond.TabIndex = 0;
+            this.lblStepsPerSecond.Text = "Steps Per Second:";
             // 
             // TelescopeControlForm
             // 
@@ -176,6 +204,7 @@ namespace TelescopeWatcher
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.TelescopeControlForm_FormClosing);
             this.grpTimeBetweenSteps.ResumeLayout(false);
             this.grpTimeBetweenSteps.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarStepsPerSecond)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
@@ -191,7 +220,9 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Label lblPortInfo;
         private System.Windows.Forms.GroupBox grpTimeBetweenSteps;
-        private System.Windows.Forms.TextBox txtCustomTime;
-        private System.Windows.Forms.Label lblCustomTime;
+        private System.Windows.Forms.TrackBar trackBarStepsPerSecond;
+        private System.Windows.Forms.Label lblStepsPerSecond;
+        private System.Windows.Forms.Label lblTimeValue;
+        private System.Windows.Forms.Label lblStepsPerSecondValue;
     }
 }

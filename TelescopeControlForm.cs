@@ -9,7 +9,10 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Timer commandTimer;
         private string currentDirection = "";
         private bool isKeyPressed = false;
-        private int timeBetweenSteps = 20; // Default 20ms
+        private int timeBetweenSteps = 10; // Default 10ms (100 steps/second)
+        
+        // Steps per second values corresponding to trackbar positions
+        private readonly int[] stepsPerSecondValues = { 3, 1, 10, 100, 1000, 10000 };
 
         public TelescopeControlForm(SerialPort port, string portName)
         {
@@ -40,27 +43,57 @@ namespace TelescopeWatcher
             this.KeyDown += TelescopeControlForm_KeyDown;
             this.KeyUp += TelescopeControlForm_KeyUp;
             
-            // Set default time value
-            txtCustomTime.Text = timeBetweenSteps.ToString();
+            // Set default trackbar value and update display
+            UpdateStepsPerSecondDisplay();
         }
 
-        private void txtCustomTime_TextChanged(object? sender, EventArgs e)
+        private void trackBarStepsPerSecond_Scroll(object? sender, EventArgs e)
         {
-            if (int.TryParse(txtCustomTime.Text, out int customTime))
+            UpdateStepsPerSecondDisplay();
+        }
+
+        private void UpdateStepsPerSecondDisplay()
+        {
+            int trackBarValue = trackBarStepsPerSecond.Value;
+            int stepsPerSecond = stepsPerSecondValues[trackBarValue];
+            
+            // Calculate time between steps in milliseconds
+            double timeMs = 1000.0 / stepsPerSecond;
+            timeBetweenSteps = (int)Math.Round(timeMs);
+            
+            // Ensure minimum time is at least 0.1ms for very high speeds
+            if (stepsPerSecond == 10000)
             {
-                if (customTime > 0)
-                {
-                    timeBetweenSteps = customTime;
-                    AddLogMessage($"Time between steps set to {timeBetweenSteps}ms");
-                }
+                timeBetweenSteps = 0; // Will send as t=0.1 in the command
             }
+            
+            // Update display labels
+            lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/second";
+            
+            if (stepsPerSecond == 10000)
+            {
+                lblTimeValue.Text = "(t=0.1 ms)";
+            }
+            else
+            {
+                lblTimeValue.Text = $"(t={timeMs:F1} ms)";
+            }
+            
+            AddLogMessage($"Speed set to {stepsPerSecond} steps/second (t={(stepsPerSecond == 10000 ? "0.1" : timeMs.ToString("F1"))} ms)");
         }
 
         private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)
         {
             // Prevent auto-repeat of KeyDown events
             if (isKeyPressed)
+            {
+                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true; // Prevent default arrow key behavior
+                }
                 return;
+            }
 
             if (e.KeyCode == Keys.Up)
             {
@@ -266,15 +299,29 @@ namespace TelescopeWatcher
                 Thread.Sleep(50); // Small delay between commands
 
                 // Send time between steps command
-                string timeCommand = $"t={timeBetweenSteps}";
+                string timeCommand;
+                string timeDisplay;
+                
+                // Handle special case for 10000 steps/second (t=0.1)
+                if (timeBetweenSteps == 0)
+                {
+                    timeCommand = "t=0.1";
+                    timeDisplay = "0.1";
+                }
+                else
+                {
+                    timeCommand = $"t={timeBetweenSteps}";
+                    timeDisplay = timeBetweenSteps.ToString();
+                }
+                
                 serialPort.WriteLine(timeCommand);
-                AddLogMessage($"Sending: t={timeBetweenSteps} (Time: {timeBetweenSteps}ms)");
+                AddLogMessage($"Sending: {timeCommand} (Time: {timeDisplay}ms)");
                 Thread.Sleep(50); // Small delay between commands
 
                 // Send steps command
-                string stepsCommand = "s=100";
+                string stepsCommand = "s=10000";
                 serialPort.WriteLine(stepsCommand);
-                AddLogMessage("Sending: s=100 (Steps: 100)");
+                AddLogMessage("Sending: s=10000 (Steps: 10000)");
             }
             catch (Exception ex)
             {
@@ -295,9 +342,9 @@ namespace TelescopeWatcher
             try
             {
                 // Send only steps command (direction already set)
-                string stepsCommand = "s=100";
+                string stepsCommand = "s=10000";
                 serialPort.WriteLine(stepsCommand);
-                AddLogMessage("Sending: s=100 (Steps: 100)");
+                AddLogMessage("Sending: s=10000 (Steps: 10000)");
             }
             catch (Exception ex)
             {
