@@ -39,9 +39,6 @@ namespace TelescopeWatcher
             this.grpTimeBetweenSteps = new System.Windows.Forms.GroupBox();
             this.txtCustomTime = new System.Windows.Forms.TextBox();
             this.lblCustomTime = new System.Windows.Forms.Label();
-            this.radio15000 = new System.Windows.Forms.RadioButton();
-            this.radio10000 = new System.Windows.Forms.RadioButton();
-            this.radio5000 = new System.Windows.Forms.RadioButton();
             this.grpTimeBetweenSteps.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -132,68 +129,30 @@ namespace TelescopeWatcher
             // 
             this.grpTimeBetweenSteps.Controls.Add(this.txtCustomTime);
             this.grpTimeBetweenSteps.Controls.Add(this.lblCustomTime);
-            this.grpTimeBetweenSteps.Controls.Add(this.radio15000);
-            this.grpTimeBetweenSteps.Controls.Add(this.radio10000);
-            this.grpTimeBetweenSteps.Controls.Add(this.radio5000);
             this.grpTimeBetweenSteps.Location = new System.Drawing.Point(12, 55);
             this.grpTimeBetweenSteps.Name = "grpTimeBetweenSteps";
-            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(360, 145);
+            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(360, 70);
             this.grpTimeBetweenSteps.TabIndex = 6;
             this.grpTimeBetweenSteps.TabStop = false;
             this.grpTimeBetweenSteps.Text = "Time Between Steps";
             // 
             // txtCustomTime
             // 
-            this.txtCustomTime.Location = new System.Drawing.Point(100, 110);
+            this.txtCustomTime.Location = new System.Drawing.Point(100, 30);
             this.txtCustomTime.Name = "txtCustomTime";
             this.txtCustomTime.Size = new System.Drawing.Size(80, 23);
             this.txtCustomTime.TabIndex = 4;
-            this.txtCustomTime.Text = "5000";
+            this.txtCustomTime.Text = "20";
             this.txtCustomTime.TextChanged += new System.EventHandler(this.txtCustomTime_TextChanged);
             // 
             // lblCustomTime
             // 
             this.lblCustomTime.AutoSize = true;
-            this.lblCustomTime.Location = new System.Drawing.Point(15, 113);
+            this.lblCustomTime.Location = new System.Drawing.Point(15, 33);
             this.lblCustomTime.Name = "lblCustomTime";
-            this.lblCustomTime.Size = new System.Drawing.Size(79, 15);
+            this.lblCustomTime.Size = new System.Drawing.Size(52, 15);
             this.lblCustomTime.TabIndex = 3;
-            this.lblCustomTime.Text = "Custom (ms):";
-            // 
-            // radio15000
-            // 
-            this.radio15000.AutoSize = true;
-            this.radio15000.Location = new System.Drawing.Point(15, 80);
-            this.radio15000.Name = "radio15000";
-            this.radio15000.Size = new System.Drawing.Size(104, 19);
-            this.radio15000.TabIndex = 2;
-            this.radio15000.Text = "15000 ms (15s)";
-            this.radio15000.UseVisualStyleBackColor = true;
-            this.radio15000.CheckedChanged += new System.EventHandler(this.radio15000_CheckedChanged);
-            // 
-            // radio10000
-            // 
-            this.radio10000.AutoSize = true;
-            this.radio10000.Location = new System.Drawing.Point(15, 55);
-            this.radio10000.Name = "radio10000";
-            this.radio10000.Size = new System.Drawing.Size(104, 19);
-            this.radio10000.TabIndex = 1;
-            this.radio10000.Text = "10000 ms (10s)";
-            this.radio10000.UseVisualStyleBackColor = true;
-            this.radio10000.CheckedChanged += new System.EventHandler(this.radio10000_CheckedChanged);
-            // 
-            // radio5000
-            // 
-            this.radio5000.AutoSize = true;
-            this.radio5000.Checked = true;
-            this.radio5000.Location = new System.Drawing.Point(15, 30);
-            this.radio5000.Name = "radio5000";
-            this.radio5000.Size = new System.Drawing.Size(94, 19);
-            this.radio5000.TabIndex = 0;
-            this.radio5000.TabStop = true;
-            this.radio5000.Text = "5000 ms (5s)";
-            this.radio5000.UseVisualStyleBackColor = true;
-            this.radio5000.CheckedChanged += new System.EventHandler(this.radio5000_CheckedChanged);
+            this.lblCustomTime.Text = "Time (ms):";
             // 
             // TelescopeControlForm
             // 
@@ -232,9 +191,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Label lblPortInfo;
         private System.Windows.Forms.GroupBox grpTimeBetweenSteps;
-        private System.Windows.Forms.RadioButton radio15000;
-        private System.Windows.Forms.RadioButton radio10000;
-        private System.Windows.Forms.RadioButton radio5000;
         private System.Windows.Forms.TextBox txtCustomTime;
         private System.Windows.Forms.Label lblCustomTime;
     }

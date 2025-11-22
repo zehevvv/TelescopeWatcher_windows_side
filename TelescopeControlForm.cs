@@ -9,7 +9,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Timer commandTimer;
         private string currentDirection = "";
         private bool isKeyPressed = false;
-        private int timeBetweenSteps = 5000; // Default 5000ms
+        private int timeBetweenSteps = 20; // Default 20ms
 
         public TelescopeControlForm(SerialPort port, string portName)
         {
@@ -44,36 +44,6 @@ namespace TelescopeWatcher
             txtCustomTime.Text = timeBetweenSteps.ToString();
         }
 
-        private void radio5000_CheckedChanged(object? sender, EventArgs e)
-        {
-            if (radio5000.Checked)
-            {
-                timeBetweenSteps = 5000;
-                txtCustomTime.Text = "5000";
-                AddLogMessage("Time between steps set to 5000ms");
-            }
-        }
-
-        private void radio10000_CheckedChanged(object? sender, EventArgs e)
-        {
-            if (radio10000.Checked)
-            {
-                timeBetweenSteps = 10000;
-                txtCustomTime.Text = "10000";
-                AddLogMessage("Time between steps set to 10000ms");
-            }
-        }
-
-        private void radio15000_CheckedChanged(object? sender, EventArgs e)
-        {
-            if (radio15000.Checked)
-            {
-                timeBetweenSteps = 15000;
-                txtCustomTime.Text = "15000";
-                AddLogMessage("Time between steps set to 15000ms");
-            }
-        }
-
         private void txtCustomTime_TextChanged(object? sender, EventArgs e)
         {
             if (int.TryParse(txtCustomTime.Text, out int customTime))
@@ -81,10 +51,7 @@ namespace TelescopeWatcher
                 if (customTime > 0)
                 {
                     timeBetweenSteps = customTime;
-                    // Uncheck all radio buttons when custom value is entered
-                    radio5000.Checked = false;
-                    radio10000.Checked = false;
-                    radio15000.Checked = false;
+                    AddLogMessage($"Time between steps set to {timeBetweenSteps}ms");
                 }
             }
         }
