@@ -260,7 +260,7 @@ namespace TelescopeWatcher
                 if (direction == "UP")
                 {
                     motorCommand = "v=0"; // Up/Down motor
-                    directionCommand = "d=1";
+                    directionCommand = "d=0";
                     AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
                     serialPort.WriteLine(motorCommand);
                     Thread.Sleep(50);
@@ -269,7 +269,7 @@ namespace TelescopeWatcher
                 else if (direction == "DOWN")
                 {
                     motorCommand = "v=0"; // Up/Down motor
-                    directionCommand = "d=0";
+                    directionCommand = "d=1";
                     AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
                     serialPort.WriteLine(motorCommand);
                     Thread.Sleep(50);
