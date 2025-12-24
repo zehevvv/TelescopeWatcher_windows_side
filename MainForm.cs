@@ -7,6 +7,8 @@ namespace TelescopeWatcher
         private SerialPort? serialPort;
         private string? selectedPort;
         private TelescopeControlForm? telescopeControlForm;
+        private bool isServerMode = false;
+        private string serverUrl = "http://192.168.1.100:5002";
 
         public MainForm()
         {
@@ -16,7 +18,49 @@ namespace TelescopeWatcher
         private void MainForm_Load(object sender, EventArgs e)
         {
             RefreshPortList();
-            AddStatusMessage("Application started. Please select a COM port and click Connect.");
+            UpdateUIForConnectionMode();
+            AddStatusMessage("Application started. Please select connection mode and click Connect.");
+        }
+
+        private void radioSerial_CheckedChanged(object sender, EventArgs e)
+        {
+            if (radioSerial.Checked)
+            {
+                isServerMode = false;
+                UpdateUIForConnectionMode();
+                AddStatusMessage("Connection mode: USB Serial");
+            }
+        }
+
+        private void radioServer_CheckedChanged(object sender, EventArgs e)
+        {
+            if (radioServer.Checked)
+            {
+                isServerMode = true;
+                serverUrl = txtServerUrl.Text;
+                UpdateUIForConnectionMode();
+                AddStatusMessage("Connection mode: HTTP Server");
+            }
+        }
+
+        private void UpdateUIForConnectionMode()
+        {
+            if (isServerMode)
+            {
+                // Server mode
+                txtServerUrl.Enabled = true;
+                listBoxPorts.Enabled = false;
+                btnRefresh.Enabled = false;
+                lblPorts.Text = "Server Mode:";
+            }
+            else
+            {
+                // Serial mode
+                txtServerUrl.Enabled = false;
+                listBoxPorts.Enabled = true;
+                btnRefresh.Enabled = true;
+                lblPorts.Text = "Available COM Ports:";
+            }
         }
 
         private void btnRefresh_Click(object sender, EventArgs e)
@@ -26,20 +70,76 @@ namespace TelescopeWatcher
 
         private void btnConnect_Click(object sender, EventArgs e)
         {
-            if (listBoxPorts.SelectedItem == null)
+            if (isServerMode)
             {
-                MessageBox.Show("Please select a COM port first.", "No Port Selected", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                ConnectToServer();
             }
+            else
+            {
+                if (listBoxPorts.SelectedItem == null)
+                {
+                    MessageBox.Show("Please select a COM port first.", "No Port Selected", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
 
-            selectedPort = listBoxPorts.SelectedItem.ToString();
-            ConnectToPort(selectedPort!);
+                selectedPort = listBoxPorts.SelectedItem.ToString();
+                ConnectToPort(selectedPort!);
+            }
         }
 
         private void btnDisconnect_Click(object sender, EventArgs e)
         {
             DisconnectFromPort();
+        }
+
+        private void ConnectToServer()
+        {
+            try
+            {
+                serverUrl = txtServerUrl.Text.Trim();
+                
+                if (string.IsNullOrEmpty(serverUrl))
+                {
+                    MessageBox.Show("Please enter a server URL.", "No Server URL", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                AddStatusMessage($"Connecting to server: {serverUrl}");
+                
+                // Test server connection
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(5);
+                    var response = client.GetAsync($"{serverUrl}/read").Result;
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        AddStatusMessage($"Successfully connected to server: {serverUrl}");
+                        
+                        // Update UI
+                        btnConnect.Enabled = false;
+                        btnDisconnect.Enabled = true;
+                        radioSerial.Enabled = false;
+                        radioServer.Enabled = false;
+                        txtServerUrl.Enabled = false;
+                        
+                        // Open telescope control window
+                        OpenTelescopeControlForServer();
+                    }
+                    else
+                    {
+                        throw new Exception($"Server returned status: {response.StatusCode}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AddStatusMessage($"Error connecting to server: {ex.Message}");
+                MessageBox.Show($"Failed to connect to server.\r\n\r\nError: {ex.Message}", 
+                    "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void RefreshPortList()
@@ -93,6 +193,8 @@ namespace TelescopeWatcher
                 btnDisconnect.Enabled = true;
                 btnRefresh.Enabled = false;
                 listBoxPorts.Enabled = false;
+                radioSerial.Enabled = false;
+                radioServer.Enabled = false;
 
                 // Open telescope control window
                 OpenTelescopeControl();
@@ -109,10 +211,17 @@ namespace TelescopeWatcher
         {
             if (serialPort != null && serialPort.IsOpen)
             {
-                telescopeControlForm = new TelescopeControlForm(serialPort, selectedPort!);
+                telescopeControlForm = new TelescopeControlForm(serialPort, null, selectedPort!);
                 telescopeControlForm.Show();
                 AddStatusMessage("Telescope control window opened.");
             }
+        }
+
+        private void OpenTelescopeControlForServer()
+        {
+            telescopeControlForm = new TelescopeControlForm(null, serverUrl, $"Server: {serverUrl}");
+            telescopeControlForm.Show();
+            AddStatusMessage("Telescope control window opened.");
         }
 
         private void DisconnectFromPort()
@@ -141,12 +250,18 @@ namespace TelescopeWatcher
                     serialPort = null;
                 }
             }
+            
+            if (isServerMode)
+            {
+                AddStatusMessage($"Disconnected from server: {serverUrl}");
+            }
 
             // Update UI
             btnConnect.Enabled = true;
             btnDisconnect.Enabled = false;
-            btnRefresh.Enabled = true;
-            listBoxPorts.Enabled = true;
+            radioSerial.Enabled = true;
+            radioServer.Enabled = true;
+            UpdateUIForConnectionMode();
         }
 
         private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)

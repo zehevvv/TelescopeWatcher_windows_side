@@ -4,22 +4,37 @@ namespace TelescopeWatcher
 {
     public partial class TelescopeControlForm : Form
     {
-        private SerialPort serialPort;
+        private SerialPort? serialPort;
+        private SerialServerClient? serverClient;
         private string portName;
         private System.Windows.Forms.Timer commandTimer;
         private string currentDirection = "";
         private bool isKeyPressed = false;
         private int timeBetweenSteps = 10; // Default 10ms (100 steps/second)
+        private bool isServerMode = false;
         
         // Steps per second values corresponding to trackbar positions
         private readonly int[] stepsPerSecondValues = { 3, 1, 10, 100, 1000, 10000 };
 
-        public TelescopeControlForm(SerialPort port, string portName)
+        public TelescopeControlForm(SerialPort? port, string? serverUrl, string portName)
         {
             InitializeComponent();
-            this.serialPort = port;
+            
+            if (serverUrl != null)
+            {
+                // Server mode
+                this.serverClient = new SerialServerClient(serverUrl);
+                this.isServerMode = true;
+            }
+            else
+            {
+                // Serial mode
+                this.serialPort = port;
+                this.isServerMode = false;
+            }
+            
             this.portName = portName;
-            lblPortInfo.Text = $"Connected: {portName} @ {port.BaudRate} baud";
+            lblPortInfo.Text = $"Connected: {portName}";
             
             // Enable key preview to capture keyboard events
             this.KeyPreview = true;
@@ -243,12 +258,25 @@ namespace TelescopeWatcher
 
         private void SendTelescopeCommand(string direction)
         {
-            if (serialPort == null || !serialPort.IsOpen)
+            if (isServerMode)
             {
-                AddLogMessage("Error: Serial port is not open!");
-                MessageBox.Show("Serial port is not connected.", "Connection Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    AddLogMessage("Error: Server connection is not available!");
+                    MessageBox.Show("Server is not connected.", "Connection Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    AddLogMessage("Error: Serial port is not open!");
+                    MessageBox.Show("Serial port is not connected.", "Connection Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
             }
 
             try
@@ -262,7 +290,7 @@ namespace TelescopeWatcher
                     motorCommand = "v=0"; // Up/Down motor
                     directionCommand = "d=0";
                     AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
-                    serialPort.WriteLine(motorCommand);
+                    WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=1 (Direction: UP)");
                 }
@@ -271,7 +299,7 @@ namespace TelescopeWatcher
                     motorCommand = "v=0"; // Up/Down motor
                     directionCommand = "d=1";
                     AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
-                    serialPort.WriteLine(motorCommand);
+                    WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=0 (Direction: DOWN)");
                 }
@@ -280,7 +308,7 @@ namespace TelescopeWatcher
                     motorCommand = "v=1"; // Left/Right motor
                     directionCommand = "d=0";
                     AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
-                    serialPort.WriteLine(motorCommand);
+                    WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=0 (Direction: LEFT)");
                 }
@@ -289,13 +317,13 @@ namespace TelescopeWatcher
                     motorCommand = "v=1"; // Left/Right motor
                     directionCommand = "d=1";
                     AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
-                    serialPort.WriteLine(motorCommand);
+                    WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=1 (Direction: RIGHT)");
                 }
 
                 // Send direction command
-                serialPort.WriteLine(directionCommand);
+                WriteCommand(directionCommand);
                 Thread.Sleep(50); // Small delay between commands
 
                 // Send time between steps command
@@ -314,13 +342,13 @@ namespace TelescopeWatcher
                     timeDisplay = timeBetweenSteps.ToString();
                 }
                 
-                serialPort.WriteLine(timeCommand);
+                WriteCommand(timeCommand);
                 AddLogMessage($"Sending: {timeCommand} (Time: {timeDisplay}ms)");
                 Thread.Sleep(50); // Small delay between commands
 
                 // Send steps command
                 string stepsCommand = "s=10000";
-                serialPort.WriteLine(stepsCommand);
+                WriteCommand(stepsCommand);
                 AddLogMessage("Sending: s=10000 (Steps: 10000)");
             }
             catch (Exception ex)
@@ -333,17 +361,28 @@ namespace TelescopeWatcher
 
         private void SendStepsCommand()
         {
-            if (serialPort == null || !serialPort.IsOpen)
+            if (isServerMode)
             {
-                commandTimer.Stop();
-                return;
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    commandTimer.Stop();
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    commandTimer.Stop();
+                    return;
+                }
             }
 
             try
             {
                 // Send only steps command (direction already set)
                 string stepsCommand = "s=10000";
-                serialPort.WriteLine(stepsCommand);
+                WriteCommand(stepsCommand);
                 AddLogMessage("Sending: s=10000 (Steps: 10000)");
             }
             catch (Exception ex)
@@ -355,21 +394,43 @@ namespace TelescopeWatcher
 
         private void SendStopCommand()
         {
-            if (serialPort == null || !serialPort.IsOpen)
+            if (isServerMode)
             {
-                return;
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    return;
+                }
             }
 
             try
             {
                 // Send stop command
                 string stopCommand = "s=0";
-                serialPort.WriteLine(stopCommand);
+                WriteCommand(stopCommand);
                 AddLogMessage("Sending: s=0 (STOP)");
             }
             catch (Exception ex)
             {
                 AddLogMessage($"Error sending stop command: {ex.Message}");
+            }
+        }
+
+        private void WriteCommand(string command)
+        {
+            if (isServerMode)
+            {
+                serverClient?.WriteLine(command);
+            }
+            else
+            {
+                serialPort?.WriteLine(command);
             }
         }
 
@@ -394,6 +455,12 @@ namespace TelescopeWatcher
             // Stop timer and cleanup
             commandTimer?.Stop();
             commandTimer?.Dispose();
+            
+            // Cleanup server client if in server mode
+            if (isServerMode && serverClient != null)
+            {
+                serverClient.Dispose();
+            }
             
             // Don't close the serial port here - let the main form handle it
             AddLogMessage("Telescope control window closed.");
