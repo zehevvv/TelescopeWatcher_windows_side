@@ -115,12 +115,12 @@ namespace TelescopeWatcher
             // 
             // txtLog
             // 
-            this.txtLog.Location = new System.Drawing.Point(12, 410);
+            this.txtLog.Location = new System.Drawing.Point(12, 330);
             this.txtLog.Multiline = true;
             this.txtLog.Name = "txtLog";
             this.txtLog.ReadOnly = true;
             this.txtLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtLog.Size = new System.Drawing.Size(580, 150);
+            this.txtLog.Size = new System.Drawing.Size(580, 120);
             this.txtLog.TabIndex = 2;
             // 
             // lblControl
@@ -136,7 +136,7 @@ namespace TelescopeWatcher
             // lblStatus
             // 
             this.lblStatus.AutoSize = true;
-            this.lblStatus.Location = new System.Drawing.Point(12, 390);
+            this.lblStatus.Location = new System.Drawing.Point(12, 308);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(88, 15);
             this.lblStatus.TabIndex = 4;
@@ -146,7 +146,7 @@ namespace TelescopeWatcher
             // 
             this.lblPortInfo.AutoSize = true;
             this.lblPortInfo.ForeColor = System.Drawing.Color.Green;
-            this.lblPortInfo.Location = new System.Drawing.Point(12, 370);
+            this.lblPortInfo.Location = new System.Drawing.Point(400, 20);
             this.lblPortInfo.Name = "lblPortInfo";
             this.lblPortInfo.Size = new System.Drawing.Size(100, 15);
             this.lblPortInfo.TabIndex = 5;
@@ -213,9 +213,9 @@ namespace TelescopeWatcher
             this.grpFocusControl.Controls.Add(this.lblFocusSpeed);
             this.grpFocusControl.Controls.Add(this.btnFocusDecrease);
             this.grpFocusControl.Controls.Add(this.btnFocusIncrease);
-            this.grpFocusControl.Location = new System.Drawing.Point(390, 55);
+            this.grpFocusControl.Location = new System.Drawing.Point(12, 210);
             this.grpFocusControl.Name = "grpFocusControl";
-            this.grpFocusControl.Size = new System.Drawing.Size(200, 145);
+            this.grpFocusControl.Size = new System.Drawing.Size(580, 85);
             this.grpFocusControl.TabIndex = 9;
             this.grpFocusControl.TabStop = false;
             this.grpFocusControl.Text = "Focus Control";
@@ -224,7 +224,7 @@ namespace TelescopeWatcher
             // 
             this.lblFocusSpeedValue.AutoSize = true;
             this.lblFocusSpeedValue.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblFocusSpeedValue.Location = new System.Drawing.Point(75, 110);
+            this.lblFocusSpeedValue.Location = new System.Drawing.Point(485, 50);
             this.lblFocusSpeedValue.Name = "lblFocusSpeedValue";
             this.lblFocusSpeedValue.Size = new System.Drawing.Size(61, 19);
             this.lblFocusSpeedValue.TabIndex = 4;
@@ -233,11 +233,11 @@ namespace TelescopeWatcher
             // trackBarFocusSpeed
             // 
             this.trackBarFocusSpeed.LargeChange = 1;
-            this.trackBarFocusSpeed.Location = new System.Drawing.Point(15, 80);
+            this.trackBarFocusSpeed.Location = new System.Drawing.Point(280, 25);
             this.trackBarFocusSpeed.Maximum = 18;
             this.trackBarFocusSpeed.Minimum = 1;
             this.trackBarFocusSpeed.Name = "trackBarFocusSpeed";
-            this.trackBarFocusSpeed.Size = new System.Drawing.Size(170, 45);
+            this.trackBarFocusSpeed.Size = new System.Drawing.Size(200, 45);
             this.trackBarFocusSpeed.TabIndex = 3;
             this.trackBarFocusSpeed.Value = 9;
             this.trackBarFocusSpeed.Scroll += new System.EventHandler(this.trackBarFocusSpeed_Scroll);
@@ -245,7 +245,7 @@ namespace TelescopeWatcher
             // lblFocusSpeed
             // 
             this.lblFocusSpeed.AutoSize = true;
-            this.lblFocusSpeed.Location = new System.Drawing.Point(15, 62);
+            this.lblFocusSpeed.Location = new System.Drawing.Point(280, 10);
             this.lblFocusSpeed.Name = "lblFocusSpeed";
             this.lblFocusSpeed.Size = new System.Drawing.Size(76, 15);
             this.lblFocusSpeed.TabIndex = 2;
@@ -258,9 +258,9 @@ namespace TelescopeWatcher
             this.btnFocusDecrease.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
             this.btnFocusDecrease.FlatAppearance.BorderSize = 2;
             this.btnFocusDecrease.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.btnFocusDecrease.Location = new System.Drawing.Point(105, 25);
+            this.btnFocusDecrease.Location = new System.Drawing.Point(115, 25);
             this.btnFocusDecrease.Name = "btnFocusDecrease";
-            this.btnFocusDecrease.Size = new System.Drawing.Size(80, 30);
+            this.btnFocusDecrease.Size = new System.Drawing.Size(100, 40);
             this.btnFocusDecrease.TabIndex = 1;
             this.btnFocusDecrease.Text = "NEAR (-)";
             this.btnFocusDecrease.UseVisualStyleBackColor = false;
@@ -275,7 +275,7 @@ namespace TelescopeWatcher
             this.btnFocusIncrease.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
             this.btnFocusIncrease.Location = new System.Drawing.Point(15, 25);
             this.btnFocusIncrease.Name = "btnFocusIncrease";
-            this.btnFocusIncrease.Size = new System.Drawing.Size(80, 30);
+            this.btnFocusIncrease.Size = new System.Drawing.Size(90, 40);
             this.btnFocusIncrease.TabIndex = 0;
             this.btnFocusIncrease.Text = "FAR (+)";
             this.btnFocusIncrease.UseVisualStyleBackColor = false;
@@ -285,7 +285,7 @@ namespace TelescopeWatcher
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(604, 411);
+            this.ClientSize = new System.Drawing.Size(604, 465);
             this.Controls.Add(this.grpFocusControl);
             this.Controls.Add(this.btnRight);
             this.Controls.Add(this.btnLeft);

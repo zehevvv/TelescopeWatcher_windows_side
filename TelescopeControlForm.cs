@@ -1,4 +1,5 @@
 using System.IO.Ports;
+using System.Diagnostics;
 
 namespace TelescopeWatcher
 {
@@ -9,6 +10,7 @@ namespace TelescopeWatcher
         private string portName;
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
+        private System.Windows.Forms.Timer? serverReadTimer;
         private string currentDirection = "";
         private string currentFocusDirection = "";
         private bool isKeyPressed = false;
@@ -52,6 +54,16 @@ namespace TelescopeWatcher
             focusTimer = new System.Windows.Forms.Timer();
             focusTimer.Interval = 100; // 100ms interval
             focusTimer.Tick += FocusTimer_Tick;
+            
+            // Initialize server read timer (only for server mode)
+            if (isServerMode)
+            {
+                serverReadTimer = new System.Windows.Forms.Timer();
+                serverReadTimer.Interval = 200; // 200ms interval
+                serverReadTimer.Tick += ServerReadTimer_Tick;
+                serverReadTimer.Start();
+                AddLogMessage("Server read polling started (200ms interval)");
+            }
             
             // Wire up MouseDown and MouseUp events for buttons
             btnUp.MouseDown += BtnUp_MouseDown;
@@ -322,6 +334,40 @@ namespace TelescopeWatcher
             if (!string.IsNullOrEmpty(currentFocusDirection))
             {
                 SendFocusStepsCommand();
+            }
+        }
+
+        private void ServerReadTimer_Tick(object? sender, EventArgs e)
+        {
+            if (serverClient == null || !serverClient.IsConnected())
+            {
+                return;
+            }
+
+            try
+            {
+                string data = serverClient.ReadExisting();
+                if (!string.IsNullOrEmpty(data))
+                {
+                    Debug.WriteLine($"Server Response: {data.Trim()}");
+                    // Display received data in log
+                    if (txtLog.InvokeRequired)
+                    {
+                        txtLog.Invoke(new Action(() =>
+                        {
+                            AddLogMessage($"Server Response: {data.Trim()}");
+                        }));
+                    }
+                    else
+                    {
+                        AddLogMessage($"Server Response: {data.Trim()}");
+                    }
+                }
+            }
+            catch
+            {
+                // Silently ignore errors to avoid flooding the log
+                // Could optionally log errors less frequently
             }
         }
 
@@ -686,6 +732,13 @@ namespace TelescopeWatcher
             commandTimer?.Dispose();
             focusTimer?.Stop();
             focusTimer?.Dispose();
+            
+            if (isServerMode && serverReadTimer != null)
+            {
+                serverReadTimer.Stop();
+                serverReadTimer.Dispose();
+                AddLogMessage("Server read polling stopped");
+            }
             
             // Cleanup server client if in server mode
             if (isServerMode && serverClient != null)

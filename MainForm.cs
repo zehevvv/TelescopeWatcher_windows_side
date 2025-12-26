@@ -8,7 +8,7 @@ namespace TelescopeWatcher
         private string? selectedPort;
         private TelescopeControlForm? telescopeControlForm;
         private bool isServerMode = false;
-        private string serverUrl = "http://192.168.1.100:5002";
+        private string serverUrl = "http://192.168.0.211:5002";
 
         public MainForm()
         {
