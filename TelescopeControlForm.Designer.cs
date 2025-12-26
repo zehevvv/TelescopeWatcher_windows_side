@@ -41,8 +41,16 @@ namespace TelescopeWatcher
             this.lblTimeValue = new System.Windows.Forms.Label();
             this.trackBarStepsPerSecond = new System.Windows.Forms.TrackBar();
             this.lblStepsPerSecond = new System.Windows.Forms.Label();
+            this.grpFocusControl = new System.Windows.Forms.GroupBox();
+            this.lblFocusSpeedValue = new System.Windows.Forms.Label();
+            this.trackBarFocusSpeed = new System.Windows.Forms.TrackBar();
+            this.lblFocusSpeed = new System.Windows.Forms.Label();
+            this.btnFocusDecrease = new System.Windows.Forms.Button();
+            this.btnFocusIncrease = new System.Windows.Forms.Button();
             this.grpTimeBetweenSteps.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarStepsPerSecond)).BeginInit();
+            this.grpFocusControl.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarFocusSpeed)).BeginInit();
             this.SuspendLayout();
             // 
             // btnUp
@@ -107,7 +115,7 @@ namespace TelescopeWatcher
             // 
             // txtLog
             // 
-            this.txtLog.Location = new System.Drawing.Point(12, 250);
+            this.txtLog.Location = new System.Drawing.Point(12, 410);
             this.txtLog.Multiline = true;
             this.txtLog.Name = "txtLog";
             this.txtLog.ReadOnly = true;
@@ -128,7 +136,7 @@ namespace TelescopeWatcher
             // lblStatus
             // 
             this.lblStatus.AutoSize = true;
-            this.lblStatus.Location = new System.Drawing.Point(12, 230);
+            this.lblStatus.Location = new System.Drawing.Point(12, 390);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(88, 15);
             this.lblStatus.TabIndex = 4;
@@ -138,7 +146,7 @@ namespace TelescopeWatcher
             // 
             this.lblPortInfo.AutoSize = true;
             this.lblPortInfo.ForeColor = System.Drawing.Color.Green;
-            this.lblPortInfo.Location = new System.Drawing.Point(12, 210);
+            this.lblPortInfo.Location = new System.Drawing.Point(12, 370);
             this.lblPortInfo.Name = "lblPortInfo";
             this.lblPortInfo.Size = new System.Drawing.Size(100, 15);
             this.lblPortInfo.TabIndex = 5;
@@ -198,11 +206,87 @@ namespace TelescopeWatcher
             this.lblStepsPerSecond.TabIndex = 0;
             this.lblStepsPerSecond.Text = "Steps Per Second:";
             // 
+            // grpFocusControl
+            // 
+            this.grpFocusControl.Controls.Add(this.lblFocusSpeedValue);
+            this.grpFocusControl.Controls.Add(this.trackBarFocusSpeed);
+            this.grpFocusControl.Controls.Add(this.lblFocusSpeed);
+            this.grpFocusControl.Controls.Add(this.btnFocusDecrease);
+            this.grpFocusControl.Controls.Add(this.btnFocusIncrease);
+            this.grpFocusControl.Location = new System.Drawing.Point(390, 55);
+            this.grpFocusControl.Name = "grpFocusControl";
+            this.grpFocusControl.Size = new System.Drawing.Size(200, 145);
+            this.grpFocusControl.TabIndex = 9;
+            this.grpFocusControl.TabStop = false;
+            this.grpFocusControl.Text = "Focus Control";
+            // 
+            // lblFocusSpeedValue
+            // 
+            this.lblFocusSpeedValue.AutoSize = true;
+            this.lblFocusSpeedValue.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblFocusSpeedValue.Location = new System.Drawing.Point(75, 110);
+            this.lblFocusSpeedValue.Name = "lblFocusSpeedValue";
+            this.lblFocusSpeedValue.Size = new System.Drawing.Size(61, 19);
+            this.lblFocusSpeedValue.TabIndex = 4;
+            this.lblFocusSpeedValue.Text = "Speed: 9";
+            // 
+            // trackBarFocusSpeed
+            // 
+            this.trackBarFocusSpeed.LargeChange = 1;
+            this.trackBarFocusSpeed.Location = new System.Drawing.Point(15, 80);
+            this.trackBarFocusSpeed.Maximum = 18;
+            this.trackBarFocusSpeed.Minimum = 1;
+            this.trackBarFocusSpeed.Name = "trackBarFocusSpeed";
+            this.trackBarFocusSpeed.Size = new System.Drawing.Size(170, 45);
+            this.trackBarFocusSpeed.TabIndex = 3;
+            this.trackBarFocusSpeed.Value = 9;
+            this.trackBarFocusSpeed.Scroll += new System.EventHandler(this.trackBarFocusSpeed_Scroll);
+            // 
+            // lblFocusSpeed
+            // 
+            this.lblFocusSpeed.AutoSize = true;
+            this.lblFocusSpeed.Location = new System.Drawing.Point(15, 62);
+            this.lblFocusSpeed.Name = "lblFocusSpeed";
+            this.lblFocusSpeed.Size = new System.Drawing.Size(76, 15);
+            this.lblFocusSpeed.TabIndex = 2;
+            this.lblFocusSpeed.Text = "Motor Speed:";
+            // 
+            // btnFocusDecrease
+            // 
+            this.btnFocusDecrease.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.btnFocusDecrease.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnFocusDecrease.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
+            this.btnFocusDecrease.FlatAppearance.BorderSize = 2;
+            this.btnFocusDecrease.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.btnFocusDecrease.Location = new System.Drawing.Point(105, 25);
+            this.btnFocusDecrease.Name = "btnFocusDecrease";
+            this.btnFocusDecrease.Size = new System.Drawing.Size(80, 30);
+            this.btnFocusDecrease.TabIndex = 1;
+            this.btnFocusDecrease.Text = "NEAR (-)";
+            this.btnFocusDecrease.UseVisualStyleBackColor = false;
+            this.btnFocusDecrease.Click += new System.EventHandler(this.btnFocusDecrease_Click);
+            // 
+            // btnFocusIncrease
+            // 
+            this.btnFocusIncrease.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.btnFocusIncrease.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnFocusIncrease.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
+            this.btnFocusIncrease.FlatAppearance.BorderSize = 2;
+            this.btnFocusIncrease.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.btnFocusIncrease.Location = new System.Drawing.Point(15, 25);
+            this.btnFocusIncrease.Name = "btnFocusIncrease";
+            this.btnFocusIncrease.Size = new System.Drawing.Size(80, 30);
+            this.btnFocusIncrease.TabIndex = 0;
+            this.btnFocusIncrease.Text = "FAR (+)";
+            this.btnFocusIncrease.UseVisualStyleBackColor = false;
+            this.btnFocusIncrease.Click += new System.EventHandler(this.btnFocusIncrease_Click);
+            // 
             // TelescopeControlForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(604, 411);
+            this.Controls.Add(this.grpFocusControl);
             this.Controls.Add(this.btnRight);
             this.Controls.Add(this.btnLeft);
             this.Controls.Add(this.grpTimeBetweenSteps);
@@ -221,6 +305,9 @@ namespace TelescopeWatcher
             this.grpTimeBetweenSteps.ResumeLayout(false);
             this.grpTimeBetweenSteps.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarStepsPerSecond)).EndInit();
+            this.grpFocusControl.ResumeLayout(false);
+            this.grpFocusControl.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarFocusSpeed)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
@@ -240,5 +327,11 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblStepsPerSecond;
         private System.Windows.Forms.Label lblTimeValue;
         private System.Windows.Forms.Label lblStepsPerSecondValue;
+        private System.Windows.Forms.GroupBox grpFocusControl;
+        private System.Windows.Forms.Button btnFocusIncrease;
+        private System.Windows.Forms.Button btnFocusDecrease;
+        private System.Windows.Forms.Label lblFocusSpeed;
+        private System.Windows.Forms.TrackBar trackBarFocusSpeed;
+        private System.Windows.Forms.Label lblFocusSpeedValue;
     }
 }

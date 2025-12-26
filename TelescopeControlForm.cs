@@ -8,9 +8,13 @@ namespace TelescopeWatcher
         private SerialServerClient? serverClient;
         private string portName;
         private System.Windows.Forms.Timer commandTimer;
+        private System.Windows.Forms.Timer focusTimer;
         private string currentDirection = "";
+        private string currentFocusDirection = "";
         private bool isKeyPressed = false;
+        private bool isFocusKeyPressed = false;
         private int timeBetweenSteps = 10; // Default 10ms (100 steps/second)
+        private int focusSpeed = 9; // Default focus motor speed (1-18)
         private bool isServerMode = false;
         
         // Steps per second values corresponding to trackbar positions
@@ -44,6 +48,11 @@ namespace TelescopeWatcher
             commandTimer.Interval = 200; // 200ms interval
             commandTimer.Tick += CommandTimer_Tick;
             
+            // Initialize focus timer for continuous focus commands
+            focusTimer = new System.Windows.Forms.Timer();
+            focusTimer.Interval = 100; // 100ms interval
+            focusTimer.Tick += FocusTimer_Tick;
+            
             // Wire up MouseDown and MouseUp events for buttons
             btnUp.MouseDown += BtnUp_MouseDown;
             btnUp.MouseUp += BtnUp_MouseUp;
@@ -54,17 +63,36 @@ namespace TelescopeWatcher
             btnRight.MouseDown += BtnRight_MouseDown;
             btnRight.MouseUp += BtnRight_MouseUp;
             
+            // Wire up focus button events
+            btnFocusIncrease.MouseDown += BtnFocusIncrease_MouseDown;
+            btnFocusIncrease.MouseUp += BtnFocusIncrease_MouseUp;
+            btnFocusDecrease.MouseDown += BtnFocusDecrease_MouseDown;
+            btnFocusDecrease.MouseUp += BtnFocusDecrease_MouseUp;
+            
             // Wire up keyboard events
             this.KeyDown += TelescopeControlForm_KeyDown;
             this.KeyUp += TelescopeControlForm_KeyUp;
             
             // Set default trackbar value and update display
             UpdateStepsPerSecondDisplay();
+            UpdateFocusSpeedDisplay();
         }
 
         private void trackBarStepsPerSecond_Scroll(object? sender, EventArgs e)
         {
             UpdateStepsPerSecondDisplay();
+        }
+
+        private void trackBarFocusSpeed_Scroll(object? sender, EventArgs e)
+        {
+            UpdateFocusSpeedDisplay();
+        }
+
+        private void UpdateFocusSpeedDisplay()
+        {
+            focusSpeed = trackBarFocusSpeed.Value;
+            lblFocusSpeedValue.Text = $"Speed: {focusSpeed}";
+            AddLogMessage($"Focus motor speed set to {focusSpeed}");
         }
 
         private void UpdateStepsPerSecondDisplay()
@@ -100,9 +128,10 @@ namespace TelescopeWatcher
         private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)
         {
             // Prevent auto-repeat of KeyDown events
-            if (isKeyPressed)
+            if (isKeyPressed || isFocusKeyPressed)
             {
-                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right)
+                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
+                    e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
                 {
                     e.Handled = true;
                     e.SuppressKeyPress = true; // Prevent default arrow key behavior
@@ -150,6 +179,26 @@ namespace TelescopeWatcher
                 e.SuppressKeyPress = true; // Prevent default arrow key behavior
                 AddLogMessage("RIGHT arrow key pressed");
             }
+            else if (e.KeyCode == Keys.PageUp)
+            {
+                isFocusKeyPressed = true;
+                currentFocusDirection = "INCREASE";
+                SendFocusCommand("INCREASE");
+                focusTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                AddLogMessage("PageUp key pressed - Focus increase");
+            }
+            else if (e.KeyCode == Keys.PageDown)
+            {
+                isFocusKeyPressed = true;
+                currentFocusDirection = "DECREASE";
+                SendFocusCommand("DECREASE");
+                focusTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                AddLogMessage("PageDown key pressed - Focus decrease");
+            }
         }
 
         private void TelescopeControlForm_KeyUp(object? sender, KeyEventArgs e)
@@ -164,6 +213,16 @@ namespace TelescopeWatcher
                                  e.KeyCode == Keys.Left ? "LEFT" : "RIGHT";
                 AddLogMessage($"{keyName} arrow key released - stopped sending commands");
                 currentDirection = "";
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
+            {
+                isFocusKeyPressed = false;
+                focusTimer.Stop();
+                SendFocusStopCommand();
+                string keyName = e.KeyCode == Keys.PageUp ? "PageUp" : "PageDown";
+                AddLogMessage($"{keyName} key released - stopped focus commands");
+                currentFocusDirection = "";
                 e.Handled = true;
             }
         }
@@ -228,6 +287,44 @@ namespace TelescopeWatcher
             AddLogMessage("RIGHT button released - stopped sending commands");
         }
 
+        private void BtnFocusIncrease_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentFocusDirection = "INCREASE";
+            SendFocusCommand("INCREASE");
+            focusTimer.Start();
+        }
+
+        private void BtnFocusIncrease_MouseUp(object? sender, MouseEventArgs e)
+        {
+            focusTimer.Stop();
+            SendFocusStopCommand();
+            currentFocusDirection = "";
+            AddLogMessage("Focus INCREASE button released");
+        }
+
+        private void BtnFocusDecrease_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentFocusDirection = "DECREASE";
+            SendFocusCommand("DECREASE");
+            focusTimer.Start();
+        }
+
+        private void BtnFocusDecrease_MouseUp(object? sender, MouseEventArgs e)
+        {
+            focusTimer.Stop();
+            SendFocusStopCommand();
+            currentFocusDirection = "";
+            AddLogMessage("Focus DECREASE button released");
+        }
+
+        private void FocusTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(currentFocusDirection))
+            {
+                SendFocusStepsCommand();
+            }
+        }
+
         private void CommandTimer_Tick(object? sender, EventArgs e)
         {
             if (!string.IsNullOrEmpty(currentDirection))
@@ -254,6 +351,138 @@ namespace TelescopeWatcher
         private void btnRight_Click(object sender, EventArgs e)
         {
             // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
+        }
+
+        private void btnFocusIncrease_Click(object sender, EventArgs e)
+        {
+            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
+        }
+
+        private void btnFocusDecrease_Click(object sender, EventArgs e)
+        {
+            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
+        }
+
+        private void SendFocusCommand(string direction)
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    AddLogMessage("Error: Server connection is not available!");
+                    MessageBox.Show("Server is not connected.", "Connection Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    AddLogMessage("Error: Serial port is not open!");
+                    MessageBox.Show("Serial port is not connected.", "Connection Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+
+            try
+            {
+                // Set focus motor speed (b=xx where xx is 1-18)
+                string speedCommand = $"b={focusSpeed}";
+                WriteCommand(speedCommand);
+                AddLogMessage($"Sending: b={focusSpeed} (Focus Speed: {focusSpeed})");
+                Thread.Sleep(50);
+
+                // Set focus direction (a=x where x is 0 or 1)
+                string directionCommand;
+                if (direction == "INCREASE")
+                {
+                    directionCommand = "a=1";
+                    AddLogMessage("Sending: a=1 (Focus Direction: INCREASE/FAR)");
+                }
+                else // DECREASE
+                {
+                    directionCommand = "a=0";
+                    AddLogMessage("Sending: a=0 (Focus Direction: DECREASE/NEAR)");
+                }
+                WriteCommand(directionCommand);
+                Thread.Sleep(50);
+
+                // Send focus steps command (c=100 for 100 steps)
+                string stepsCommand = "c=100";
+                WriteCommand(stepsCommand);
+                AddLogMessage("Sending: c=100 (Focus Steps: 100)");
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error sending focus command: {ex.Message}");
+                MessageBox.Show($"Failed to send focus command.\r\n\r\nError: {ex.Message}", 
+                    "Communication Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void SendFocusStepsCommand()
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    focusTimer.Stop();
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    focusTimer.Stop();
+                    return;
+                }
+            }
+
+            try
+            {
+                // Send only focus steps command (direction and speed already set)
+                string stepsCommand = "c=100";
+                WriteCommand(stepsCommand);
+                AddLogMessage("Sending: c=100 (Focus Steps: 100)");
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error sending focus steps command: {ex.Message}");
+                focusTimer.Stop();
+            }
+        }
+
+        private void SendFocusStopCommand()
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                // Send focus stop command (c=0 for 0 steps)
+                string stopCommand = "c=0";
+                WriteCommand(stopCommand);
+                AddLogMessage("Sending: c=0 (Focus STOP)");
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error sending focus stop command: {ex.Message}");
+            }
         }
 
         private void SendTelescopeCommand(string direction)
@@ -452,9 +681,11 @@ namespace TelescopeWatcher
 
         private void TelescopeControlForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            // Stop timer and cleanup
+            // Stop timers and cleanup
             commandTimer?.Stop();
             commandTimer?.Dispose();
+            focusTimer?.Stop();
+            focusTimer?.Dispose();
             
             // Cleanup server client if in server mode
             if (isServerMode && serverClient != null)
