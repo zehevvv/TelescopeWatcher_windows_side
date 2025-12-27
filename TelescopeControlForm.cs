@@ -1,5 +1,5 @@
-using System.IO.Ports;
 using System.Diagnostics;
+using System.IO.Ports;
 
 namespace TelescopeWatcher
 {
