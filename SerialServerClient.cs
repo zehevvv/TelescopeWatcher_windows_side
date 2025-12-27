@@ -5,34 +5,36 @@ namespace TelescopeWatcher
     public class SerialServerClient
     {
         private readonly string serverUrl;
-        private readonly HttpClient httpClient;
+        private readonly HttpClient commandClient;
 
         public SerialServerClient(string serverUrl)
         {
             this.serverUrl = serverUrl.TrimEnd('/');
-            this.httpClient = new HttpClient();
-            this.httpClient.Timeout = TimeSpan.FromSeconds(5);
+            
+            this.commandClient = new HttpClient();
+            this.commandClient.Timeout = TimeSpan.FromSeconds(5);
         }
 
         public void WriteLine(string command)
         {
-            try
+            string encodedCmd = Uri.EscapeDataString(command);
+            string url = $"{serverUrl}/write?cmd={encodedCmd}";
+            
+            System.Diagnostics.Debug.WriteLine($"Sending: {url}");
+            
+            // Fire and forget to avoid blocking UI
+            Task.Run(async () =>
             {
-                string encodedCmd = Uri.EscapeDataString(command);
-                string url = $"{serverUrl}/write?cmd={encodedCmd}";
-                
-                var response = httpClient.GetAsync(url).Result;
-                
-                if (!response.IsSuccessStatusCode)
+                try
                 {
-                    string errorContent = response.Content.ReadAsStringAsync().Result;
-                    throw new Exception($"Server error: {response.StatusCode} - {errorContent}");
+                    var response = await commandClient.GetAsync(url);
+                    System.Diagnostics.Debug.WriteLine($"Response: {response.StatusCode}");
                 }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Failed to send command to server: {ex.Message}", ex);
-            }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
+                }
+            });
         }
 
         public string ReadExisting()
@@ -40,45 +42,28 @@ namespace TelescopeWatcher
             try
             {
                 string url = $"{serverUrl}/read";
-                var response = httpClient.GetAsync(url).Result;
+                var response = commandClient.GetAsync(url).Result;
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    return response.Content.ReadAsStringAsync().Result;
+                    return response.Content.ReadAsStringAsync().Result ?? string.Empty;
                 }
-                else
-                {
-                    throw new Exception($"Server error: {response.StatusCode}");
-                }
+                return string.Empty;
             }
-            catch (Exception ex)
+            catch
             {
-                throw new Exception($"Failed to read from server: {ex.Message}", ex);
+                return string.Empty;
             }
         }
 
         public bool IsConnected()
         {
-            try
-            {
-                string url = $"{serverUrl}/read";
-                var response = httpClient.GetAsync(url).Result;
-                return response.IsSuccessStatusCode;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        public void Close()
-        {
-            // Nothing to do for HTTP connection
+            return true;
         }
 
         public void Dispose()
         {
-            httpClient?.Dispose();
+            commandClient?.Dispose();
         }
     }
 }

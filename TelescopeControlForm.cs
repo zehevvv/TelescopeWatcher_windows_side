@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Ports;
+using System.Net.Http;
 
 namespace TelescopeWatcher
 {
@@ -10,7 +11,7 @@ namespace TelescopeWatcher
         private string portName;
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
-        private System.Windows.Forms.Timer? serverReadTimer;
+        private System.Windows.Forms.Timer? videoStatusTimer;
         private string currentDirection = "";
         private string currentFocusDirection = "";
         private bool isKeyPressed = false;
@@ -18,6 +19,8 @@ namespace TelescopeWatcher
         private int timeBetweenSteps = 10; // Default 10ms (100 steps/second)
         private int focusSpeed = 9; // Default focus motor speed (1-18)
         private bool isServerMode = false;
+        private string? videoServerUrl;
+        private HttpClient? videoHttpClient;
         
         // Steps per second values corresponding to trackbar positions
         private readonly int[] stepsPerSecondValues = { 3, 1, 10, 100, 1000, 10000 };
@@ -31,6 +34,18 @@ namespace TelescopeWatcher
                 // Server mode
                 this.serverClient = new SerialServerClient(serverUrl);
                 this.isServerMode = true;
+                
+                // Extract video server URL (port 5000)
+                try
+                {
+                    var uri = new Uri(serverUrl);
+                    this.videoServerUrl = $"{uri.Scheme}://{uri.Host}:5000";
+                    
+                    // Initialize video HTTP client with short timeout
+                    this.videoHttpClient = new HttpClient();
+                    this.videoHttpClient.Timeout = TimeSpan.FromSeconds(2);
+                }
+                catch { this.videoServerUrl = null; }
             }
             else
             {
@@ -55,17 +70,25 @@ namespace TelescopeWatcher
             focusTimer.Interval = 100; // 100ms interval
             focusTimer.Tick += FocusTimer_Tick;
             
-            // Initialize server read timer (only for server mode)
             if (isServerMode)
             {
-                serverReadTimer = new System.Windows.Forms.Timer();
-                serverReadTimer.Interval = 200; // 200ms interval
-                serverReadTimer.Tick += ServerReadTimer_Tick;
-                serverReadTimer.Start();
-                AddLogMessage("Server read polling started (200ms interval)");
+                AddLogMessage("Connected to server");
+                
+                // Start video status polling
+                videoStatusTimer = new System.Windows.Forms.Timer();
+                videoStatusTimer.Interval = 3000; // 3 seconds
+                videoStatusTimer.Tick += VideoStatusTimer_Tick;
+                videoStatusTimer.Start();
+                
+                // Initial status check
+                _ = CheckVideoServerStatusAsync();
+            }
+            else
+            {
+                grpVideoStream.Visible = false;
             }
             
-            // Wire up MouseDown and MouseUp events for buttons
+            // Wire up button events
             btnUp.MouseDown += BtnUp_MouseDown;
             btnUp.MouseUp += BtnUp_MouseUp;
             btnDown.MouseDown += BtnDown_MouseDown;
@@ -74,8 +97,6 @@ namespace TelescopeWatcher
             btnLeft.MouseUp += BtnLeft_MouseUp;
             btnRight.MouseDown += BtnRight_MouseDown;
             btnRight.MouseUp += BtnRight_MouseUp;
-            
-            // Wire up focus button events
             btnFocusIncrease.MouseDown += BtnFocusIncrease_MouseDown;
             btnFocusIncrease.MouseUp += BtnFocusIncrease_MouseUp;
             btnFocusDecrease.MouseDown += BtnFocusDecrease_MouseDown;
@@ -89,6 +110,151 @@ namespace TelescopeWatcher
             UpdateStepsPerSecondDisplay();
             UpdateFocusSpeedDisplay();
         }
+
+        #region Video Stream Control
+
+        private void VideoStatusTimer_Tick(object? sender, EventArgs e)
+        {
+            _ = CheckVideoServerStatusAsync();
+        }
+
+        private async Task CheckVideoServerStatusAsync()
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                UpdateVideoStatus(false, "No URL");
+                return;
+            }
+
+            try
+            {
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/ping");
+                UpdateVideoStatus(response.IsSuccessStatusCode, response.IsSuccessStatusCode ? "Online" : "Offline");
+            }
+            catch
+            {
+                UpdateVideoStatus(false, "Offline");
+            }
+        }
+
+        private void UpdateVideoStatus(bool isOnline, string status)
+        {
+            if (lblVideoStatus.InvokeRequired)
+            {
+                lblVideoStatus.Invoke(new Action(() => UpdateVideoStatus(isOnline, status)));
+                return;
+            }
+            
+            lblVideoStatus.Text = status;
+            lblVideoStatus.ForeColor = isOnline ? System.Drawing.Color.Green : System.Drawing.Color.Red;
+        }
+
+        private async void btnVideoStart_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                AddLogMessage("Error: Video server URL not available");
+                return;
+            }
+
+            try
+            {
+                btnVideoStart.Enabled = false;
+                AddLogMessage("Starting video stream...");
+                
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/start");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    AddLogMessage("Video stream started successfully");
+                    UpdateVideoStatus(true, "Streaming");
+                }
+                else
+                {
+                    string error = await response.Content.ReadAsStringAsync();
+                    AddLogMessage($"Failed to start video stream: {error}");
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                AddLogMessage("Video start request timed out");
+                UpdateVideoStatus(false, "Timeout");
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error starting video stream: {ex.Message}");
+            }
+            finally
+            {
+                btnVideoStart.Enabled = true;
+            }
+        }
+
+        private async void btnVideoStop_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                AddLogMessage("Error: Video server URL not available");
+                return;
+            }
+
+            try
+            {
+                btnVideoStop.Enabled = false;
+                AddLogMessage("Stopping video stream...");
+                
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/stop");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    AddLogMessage("Video stream stopped successfully");
+                    UpdateVideoStatus(true, "Online");
+                }
+                else
+                {
+                    string error = await response.Content.ReadAsStringAsync();
+                    AddLogMessage($"Failed to stop video stream: {error}");
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                AddLogMessage("Video stop request timed out");
+                UpdateVideoStatus(false, "Timeout");
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error stopping video stream: {ex.Message}");
+            }
+            finally
+            {
+                btnVideoStop.Enabled = true;
+            }
+        }
+
+        #endregion
+
+        #region Server Data Streaming
+
+        private void OnServerDataReceived(string data)
+        {
+            if (string.IsNullOrWhiteSpace(data)) return;
+            
+            try
+            {
+                string trimmed = data.Trim();
+                if (txtLog.InvokeRequired)
+                {
+                    txtLog.Invoke(new Action(() => AddLogMessage($"Server: {trimmed}")));
+                }
+                else
+                {
+                    AddLogMessage($"Server: {trimmed}");
+                }
+            }
+            catch { }
+        }
+
+        #endregion
 
         private void trackBarStepsPerSecond_Scroll(object? sender, EventArgs e)
         {
@@ -334,40 +500,6 @@ namespace TelescopeWatcher
             if (!string.IsNullOrEmpty(currentFocusDirection))
             {
                 SendFocusStepsCommand();
-            }
-        }
-
-        private void ServerReadTimer_Tick(object? sender, EventArgs e)
-        {
-            if (serverClient == null || !serverClient.IsConnected())
-            {
-                return;
-            }
-
-            try
-            {
-                string data = serverClient.ReadExisting();
-                if (!string.IsNullOrEmpty(data))
-                {
-                    Debug.WriteLine($"Server Response: {data.Trim()}");
-                    // Display received data in log
-                    if (txtLog.InvokeRequired)
-                    {
-                        txtLog.Invoke(new Action(() =>
-                        {
-                            AddLogMessage($"Server Response: {data.Trim()}");
-                        }));
-                    }
-                    else
-                    {
-                        AddLogMessage($"Server Response: {data.Trim()}");
-                    }
-                }
-            }
-            catch
-            {
-                // Silently ignore errors to avoid flooding the log
-                // Could optionally log errors less frequently
             }
         }
 
@@ -727,27 +859,16 @@ namespace TelescopeWatcher
 
         private void TelescopeControlForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            // Stop timers and cleanup
             commandTimer?.Stop();
             commandTimer?.Dispose();
             focusTimer?.Stop();
             focusTimer?.Dispose();
             
-            if (isServerMode && serverReadTimer != null)
-            {
-                serverReadTimer.Stop();
-                serverReadTimer.Dispose();
-                AddLogMessage("Server read polling stopped");
-            }
+            videoStatusTimer?.Stop();
+            videoStatusTimer?.Dispose();
+            videoHttpClient?.Dispose();
             
-            // Cleanup server client if in server mode
-            if (isServerMode && serverClient != null)
-            {
-                serverClient.Dispose();
-            }
-            
-            // Don't close the serial port here - let the main form handle it
-            AddLogMessage("Telescope control window closed.");
+            serverClient?.Dispose();
         }
     }
 }
