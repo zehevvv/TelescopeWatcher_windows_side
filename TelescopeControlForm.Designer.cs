@@ -47,10 +47,15 @@ namespace TelescopeWatcher
             this.lblFocusSpeed = new System.Windows.Forms.Label();
             this.btnFocusDecrease = new System.Windows.Forms.Button();
             this.btnFocusIncrease = new System.Windows.Forms.Button();
+            this.grpVideoStream = new System.Windows.Forms.GroupBox();
+            this.lblVideoStatus = new System.Windows.Forms.Label();
+            this.btnVideoStop = new System.Windows.Forms.Button();
+            this.btnVideoStart = new System.Windows.Forms.Button();
             this.grpTimeBetweenSteps.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarStepsPerSecond)).BeginInit();
             this.grpFocusControl.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarFocusSpeed)).BeginInit();
+            this.grpVideoStream.SuspendLayout();
             this.SuspendLayout();
             // 
             // btnUp
@@ -215,7 +220,7 @@ namespace TelescopeWatcher
             this.grpFocusControl.Controls.Add(this.btnFocusIncrease);
             this.grpFocusControl.Location = new System.Drawing.Point(12, 210);
             this.grpFocusControl.Name = "grpFocusControl";
-            this.grpFocusControl.Size = new System.Drawing.Size(580, 85);
+            this.grpFocusControl.Size = new System.Drawing.Size(370, 85);
             this.grpFocusControl.TabIndex = 9;
             this.grpFocusControl.TabStop = false;
             this.grpFocusControl.Text = "Focus Control";
@@ -224,7 +229,7 @@ namespace TelescopeWatcher
             // 
             this.lblFocusSpeedValue.AutoSize = true;
             this.lblFocusSpeedValue.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblFocusSpeedValue.Location = new System.Drawing.Point(485, 50);
+            this.lblFocusSpeedValue.Location = new System.Drawing.Point(300, 50);
             this.lblFocusSpeedValue.Name = "lblFocusSpeedValue";
             this.lblFocusSpeedValue.Size = new System.Drawing.Size(61, 19);
             this.lblFocusSpeedValue.TabIndex = 4;
@@ -233,11 +238,11 @@ namespace TelescopeWatcher
             // trackBarFocusSpeed
             // 
             this.trackBarFocusSpeed.LargeChange = 1;
-            this.trackBarFocusSpeed.Location = new System.Drawing.Point(280, 25);
+            this.trackBarFocusSpeed.Location = new System.Drawing.Point(230, 25);
             this.trackBarFocusSpeed.Maximum = 18;
             this.trackBarFocusSpeed.Minimum = 1;
             this.trackBarFocusSpeed.Name = "trackBarFocusSpeed";
-            this.trackBarFocusSpeed.Size = new System.Drawing.Size(200, 45);
+            this.trackBarFocusSpeed.Size = new System.Drawing.Size(130, 45);
             this.trackBarFocusSpeed.TabIndex = 3;
             this.trackBarFocusSpeed.Value = 9;
             this.trackBarFocusSpeed.Scroll += new System.EventHandler(this.trackBarFocusSpeed_Scroll);
@@ -245,7 +250,7 @@ namespace TelescopeWatcher
             // lblFocusSpeed
             // 
             this.lblFocusSpeed.AutoSize = true;
-            this.lblFocusSpeed.Location = new System.Drawing.Point(280, 10);
+            this.lblFocusSpeed.Location = new System.Drawing.Point(230, 10);
             this.lblFocusSpeed.Name = "lblFocusSpeed";
             this.lblFocusSpeed.Size = new System.Drawing.Size(76, 15);
             this.lblFocusSpeed.TabIndex = 2;
@@ -281,11 +286,65 @@ namespace TelescopeWatcher
             this.btnFocusIncrease.UseVisualStyleBackColor = false;
             this.btnFocusIncrease.Click += new System.EventHandler(this.btnFocusIncrease_Click);
             // 
+            // grpVideoStream
+            // 
+            this.grpVideoStream.Controls.Add(this.lblVideoStatus);
+            this.grpVideoStream.Controls.Add(this.btnVideoStop);
+            this.grpVideoStream.Controls.Add(this.btnVideoStart);
+            this.grpVideoStream.Location = new System.Drawing.Point(390, 210);
+            this.grpVideoStream.Name = "grpVideoStream";
+            this.grpVideoStream.Size = new System.Drawing.Size(200, 85);
+            this.grpVideoStream.TabIndex = 10;
+            this.grpVideoStream.TabStop = false;
+            this.grpVideoStream.Text = "Video Stream";
+            // 
+            // lblVideoStatus
+            // 
+            this.lblVideoStatus.AutoSize = true;
+            this.lblVideoStatus.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblVideoStatus.ForeColor = System.Drawing.Color.Gray;
+            this.lblVideoStatus.Location = new System.Drawing.Point(60, 60);
+            this.lblVideoStatus.Name = "lblVideoStatus";
+            this.lblVideoStatus.Size = new System.Drawing.Size(80, 15);
+            this.lblVideoStatus.TabIndex = 2;
+            this.lblVideoStatus.Text = "Checking...";
+            // 
+            // btnVideoStop
+            // 
+            this.btnVideoStop.BackColor = System.Drawing.Color.MistyRose;
+            this.btnVideoStop.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnVideoStop.FlatAppearance.BorderColor = System.Drawing.Color.IndianRed;
+            this.btnVideoStop.FlatAppearance.BorderSize = 2;
+            this.btnVideoStop.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnVideoStop.Location = new System.Drawing.Point(105, 20);
+            this.btnVideoStop.Name = "btnVideoStop";
+            this.btnVideoStop.Size = new System.Drawing.Size(80, 35);
+            this.btnVideoStop.TabIndex = 1;
+            this.btnVideoStop.Text = "Stop";
+            this.btnVideoStop.UseVisualStyleBackColor = false;
+            this.btnVideoStop.Click += new System.EventHandler(this.btnVideoStop_Click);
+            // 
+            // btnVideoStart
+            // 
+            this.btnVideoStart.BackColor = System.Drawing.Color.Honeydew;
+            this.btnVideoStart.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnVideoStart.FlatAppearance.BorderColor = System.Drawing.Color.Green;
+            this.btnVideoStart.FlatAppearance.BorderSize = 2;
+            this.btnVideoStart.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnVideoStart.Location = new System.Drawing.Point(15, 20);
+            this.btnVideoStart.Name = "btnVideoStart";
+            this.btnVideoStart.Size = new System.Drawing.Size(80, 35);
+            this.btnVideoStart.TabIndex = 0;
+            this.btnVideoStart.Text = "Start";
+            this.btnVideoStart.UseVisualStyleBackColor = false;
+            this.btnVideoStart.Click += new System.EventHandler(this.btnVideoStart_Click);
+            // 
             // TelescopeControlForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(604, 465);
+            this.Controls.Add(this.grpVideoStream);
             this.Controls.Add(this.grpFocusControl);
             this.Controls.Add(this.btnRight);
             this.Controls.Add(this.btnLeft);
@@ -308,6 +367,8 @@ namespace TelescopeWatcher
             this.grpFocusControl.ResumeLayout(false);
             this.grpFocusControl.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarFocusSpeed)).EndInit();
+            this.grpVideoStream.ResumeLayout(false);
+            this.grpVideoStream.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
@@ -333,5 +394,9 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblFocusSpeed;
         private System.Windows.Forms.TrackBar trackBarFocusSpeed;
         private System.Windows.Forms.Label lblFocusSpeedValue;
+        private System.Windows.Forms.GroupBox grpVideoStream;
+        private System.Windows.Forms.Button btnVideoStart;
+        private System.Windows.Forms.Button btnVideoStop;
+        private System.Windows.Forms.Label lblVideoStatus;
     }
 }

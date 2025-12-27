@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Ports;
+using System.Net.Http;
 
 namespace TelescopeWatcher
 {
@@ -10,62 +11,67 @@ namespace TelescopeWatcher
         private string portName;
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
-        private System.Windows.Forms.Timer? serverReadTimer;
+        private System.Windows.Forms.Timer? videoStatusTimer;
         private string currentDirection = "";
         private string currentFocusDirection = "";
         private bool isKeyPressed = false;
         private bool isFocusKeyPressed = false;
-        private int timeBetweenSteps = 10; // Default 10ms (100 steps/second)
-        private int focusSpeed = 9; // Default focus motor speed (1-18)
+        private int timeBetweenSteps = 10;
+        private int focusSpeed = 9;
         private bool isServerMode = false;
+        private string? videoServerUrl;
+        private HttpClient videoHttpClient;
         
-        // Steps per second values corresponding to trackbar positions
         private readonly int[] stepsPerSecondValues = { 3, 1, 10, 100, 1000, 10000 };
 
         public TelescopeControlForm(SerialPort? port, string? serverUrl, string portName)
         {
             InitializeComponent();
             
+            videoHttpClient = new HttpClient();
+            videoHttpClient.Timeout = TimeSpan.FromSeconds(5);
+            
             if (serverUrl != null)
             {
-                // Server mode
                 this.serverClient = new SerialServerClient(serverUrl);
                 this.isServerMode = true;
+                try
+                {
+                    var uri = new Uri(serverUrl);
+                    this.videoServerUrl = $"{uri.Scheme}://{uri.Host}:5000";
+                }
+                catch { this.videoServerUrl = null; }
             }
             else
             {
-                // Serial mode
                 this.serialPort = port;
                 this.isServerMode = false;
             }
             
             this.portName = portName;
             lblPortInfo.Text = $"Connected: {portName}";
-            
-            // Enable key preview to capture keyboard events
             this.KeyPreview = true;
             
-            // Initialize timer for continuous commands
             commandTimer = new System.Windows.Forms.Timer();
-            commandTimer.Interval = 200; // 200ms interval
+            commandTimer.Interval = 200;
             commandTimer.Tick += CommandTimer_Tick;
             
-            // Initialize focus timer for continuous focus commands
             focusTimer = new System.Windows.Forms.Timer();
-            focusTimer.Interval = 100; // 100ms interval
+            focusTimer.Interval = 100;
             focusTimer.Tick += FocusTimer_Tick;
             
-            // Initialize server read timer (only for server mode)
             if (isServerMode)
             {
-                serverReadTimer = new System.Windows.Forms.Timer();
-                serverReadTimer.Interval = 200; // 200ms interval
-                serverReadTimer.Tick += ServerReadTimer_Tick;
-                serverReadTimer.Start();
-                AddLogMessage("Server read polling started (200ms interval)");
+                serverClient?.StartStreaming(OnServerDataReceived);
+                AddLogMessage("Server streaming started");
+                videoStatusTimer = new System.Windows.Forms.Timer();
+                videoStatusTimer.Interval = 3000;
+                videoStatusTimer.Tick += VideoStatusTimer_Tick;
+                videoStatusTimer.Start();
+                CheckVideoServerStatus();
             }
+            else { grpVideoStream.Visible = false; }
             
-            // Wire up MouseDown and MouseUp events for buttons
             btnUp.MouseDown += BtnUp_MouseDown;
             btnUp.MouseUp += BtnUp_MouseUp;
             btnDown.MouseDown += BtnDown_MouseDown;
@@ -74,31 +80,65 @@ namespace TelescopeWatcher
             btnLeft.MouseUp += BtnLeft_MouseUp;
             btnRight.MouseDown += BtnRight_MouseDown;
             btnRight.MouseUp += BtnRight_MouseUp;
-            
-            // Wire up focus button events
             btnFocusIncrease.MouseDown += BtnFocusIncrease_MouseDown;
             btnFocusIncrease.MouseUp += BtnFocusIncrease_MouseUp;
             btnFocusDecrease.MouseDown += BtnFocusDecrease_MouseDown;
             btnFocusDecrease.MouseUp += BtnFocusDecrease_MouseUp;
-            
-            // Wire up keyboard events
             this.KeyDown += TelescopeControlForm_KeyDown;
             this.KeyUp += TelescopeControlForm_KeyUp;
             
-            // Set default trackbar value and update display
             UpdateStepsPerSecondDisplay();
             UpdateFocusSpeedDisplay();
         }
 
-        private void trackBarStepsPerSecond_Scroll(object? sender, EventArgs e)
+        private void VideoStatusTimer_Tick(object? sender, EventArgs e) => CheckVideoServerStatus();
+
+        private async void CheckVideoServerStatus()
         {
-            UpdateStepsPerSecondDisplay();
+            if (string.IsNullOrEmpty(videoServerUrl)) { UpdateVideoStatus(false, "No URL"); return; }
+            try
+            {
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/ping");
+                UpdateVideoStatus(response.IsSuccessStatusCode, response.IsSuccessStatusCode ? "Online" : "Offline");
+            }
+            catch { UpdateVideoStatus(false, "Offline"); }
         }
 
-        private void trackBarFocusSpeed_Scroll(object? sender, EventArgs e)
+        private void UpdateVideoStatus(bool isOnline, string status)
         {
-            UpdateFocusSpeedDisplay();
+            if (lblVideoStatus.InvokeRequired) { lblVideoStatus.Invoke(new Action(() => UpdateVideoStatus(isOnline, status))); return; }
+            lblVideoStatus.Text = status;
+            lblVideoStatus.ForeColor = isOnline ? System.Drawing.Color.Green : System.Drawing.Color.Red;
         }
+
+        private async void btnVideoStart_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl)) { AddLogMessage("Error: Video server URL not available"); return; }
+            try
+            {
+                AddLogMessage("Starting video stream...");
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/start");
+                if (response.IsSuccessStatusCode) { AddLogMessage("Video stream started successfully"); UpdateVideoStatus(true, "Streaming"); }
+                else { AddLogMessage($"Failed to start video stream: {await response.Content.ReadAsStringAsync()}"); }
+            }
+            catch (Exception ex) { AddLogMessage($"Error starting video stream: {ex.Message}"); }
+        }
+
+        private async void btnVideoStop_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl)) { AddLogMessage("Error: Video server URL not available"); return; }
+            try
+            {
+                AddLogMessage("Stopping video stream...");
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/stop");
+                if (response.IsSuccessStatusCode) { AddLogMessage("Video stream stopped successfully"); UpdateVideoStatus(true, "Online"); }
+                else { AddLogMessage($"Failed to stop video stream: {await response.Content.ReadAsStringAsync()}"); }
+            }
+            catch (Exception ex) { AddLogMessage($"Error stopping video stream: {ex.Message}"); }
+        }
+
+        private void trackBarStepsPerSecond_Scroll(object? sender, EventArgs e) => UpdateStepsPerSecondDisplay();
+        private void trackBarFocusSpeed_Scroll(object? sender, EventArgs e) => UpdateFocusSpeedDisplay();
 
         private void UpdateFocusSpeedDisplay()
         {
@@ -109,645 +149,133 @@ namespace TelescopeWatcher
 
         private void UpdateStepsPerSecondDisplay()
         {
-            int trackBarValue = trackBarStepsPerSecond.Value;
-            int stepsPerSecond = stepsPerSecondValues[trackBarValue];
-            
-            // Calculate time between steps in milliseconds
+            int stepsPerSecond = stepsPerSecondValues[trackBarStepsPerSecond.Value];
             double timeMs = 1000.0 / stepsPerSecond;
-            timeBetweenSteps = (int)Math.Round(timeMs);
-            
-            // Ensure minimum time is at least 0.1ms for very high speeds
-            if (stepsPerSecond == 10000)
-            {
-                timeBetweenSteps = 0; // Will send as t=0.1 in the command
-            }
-            
-            // Update display labels
+            timeBetweenSteps = stepsPerSecond == 10000 ? 0 : (int)Math.Round(timeMs);
             lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/second";
-            
-            if (stepsPerSecond == 10000)
-            {
-                lblTimeValue.Text = "(t=0.1 ms)";
-            }
-            else
-            {
-                lblTimeValue.Text = $"(t={timeMs:F1} ms)";
-            }
-            
-            AddLogMessage($"Speed set to {stepsPerSecond} steps/second (t={(stepsPerSecond == 10000 ? "0.1" : timeMs.ToString("F1"))} ms)");
+            lblTimeValue.Text = stepsPerSecond == 10000 ? "(t=0.1 ms)" : $"(t={timeMs:F1} ms)";
+            AddLogMessage($"Speed set to {stepsPerSecond} steps/second");
         }
 
         private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)
         {
-            // Prevent auto-repeat of KeyDown events
-            if (isKeyPressed || isFocusKeyPressed)
+            if (isKeyPressed || isFocusKeyPressed) { e.Handled = true; e.SuppressKeyPress = true; return; }
+            switch (e.KeyCode)
             {
-                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
-                    e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
-                {
-                    e.Handled = true;
-                    e.SuppressKeyPress = true; // Prevent default arrow key behavior
-                }
-                return;
+                case Keys.Up: StartDirection("UP"); break;
+                case Keys.Down: StartDirection("DOWN"); break;
+                case Keys.Left: StartDirection("LEFT"); break;
+                case Keys.Right: StartDirection("RIGHT"); break;
+                case Keys.PageUp: StartFocus("INCREASE"); break;
+                case Keys.PageDown: StartFocus("DECREASE"); break;
+                default: return;
             }
-
-            if (e.KeyCode == Keys.Up)
-            {
-                isKeyPressed = true;
-                currentDirection = "UP";
-                SendTelescopeCommand("UP");
-                commandTimer.Start();
-                e.Handled = true;
-                e.SuppressKeyPress = true; // Prevent default arrow key behavior
-                AddLogMessage("UP arrow key pressed");
-            }
-            else if (e.KeyCode == Keys.Down)
-            {
-                isKeyPressed = true;
-                currentDirection = "DOWN";
-                SendTelescopeCommand("DOWN");
-                commandTimer.Start();
-                e.Handled = true;
-                e.SuppressKeyPress = true; // Prevent default arrow key behavior
-                AddLogMessage("DOWN arrow key pressed");
-            }
-            else if (e.KeyCode == Keys.Left)
-            {
-                isKeyPressed = true;
-                currentDirection = "LEFT";
-                SendTelescopeCommand("LEFT");
-                commandTimer.Start();
-                e.Handled = true;
-                e.SuppressKeyPress = true; // Prevent default arrow key behavior
-                AddLogMessage("LEFT arrow key pressed");
-            }
-            else if (e.KeyCode == Keys.Right)
-            {
-                isKeyPressed = true;
-                currentDirection = "RIGHT";
-                SendTelescopeCommand("RIGHT");
-                commandTimer.Start();
-                e.Handled = true;
-                e.SuppressKeyPress = true; // Prevent default arrow key behavior
-                AddLogMessage("RIGHT arrow key pressed");
-            }
-            else if (e.KeyCode == Keys.PageUp)
-            {
-                isFocusKeyPressed = true;
-                currentFocusDirection = "INCREASE";
-                SendFocusCommand("INCREASE");
-                focusTimer.Start();
-                e.Handled = true;
-                e.SuppressKeyPress = true;
-                AddLogMessage("PageUp key pressed - Focus increase");
-            }
-            else if (e.KeyCode == Keys.PageDown)
-            {
-                isFocusKeyPressed = true;
-                currentFocusDirection = "DECREASE";
-                SendFocusCommand("DECREASE");
-                focusTimer.Start();
-                e.Handled = true;
-                e.SuppressKeyPress = true;
-                AddLogMessage("PageDown key pressed - Focus decrease");
-            }
+            e.Handled = true; e.SuppressKeyPress = true;
         }
+
+        private void StartDirection(string dir) { isKeyPressed = true; currentDirection = dir; SendTelescopeCommand(dir); commandTimer.Start(); AddLogMessage($"{dir} key pressed"); }
+        private void StartFocus(string dir) { isFocusKeyPressed = true; currentFocusDirection = dir; SendFocusCommand(dir); focusTimer.Start(); AddLogMessage($"Focus {dir} key pressed"); }
 
         private void TelescopeControlForm_KeyUp(object? sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right)
-            {
-                isKeyPressed = false;
-                commandTimer.Stop();
-                SendStopCommand();
-                string keyName = e.KeyCode == Keys.Up ? "UP" : 
-                                 e.KeyCode == Keys.Down ? "DOWN" : 
-                                 e.KeyCode == Keys.Left ? "LEFT" : "RIGHT";
-                AddLogMessage($"{keyName} arrow key released - stopped sending commands");
-                currentDirection = "";
-                e.Handled = true;
-            }
+            { isKeyPressed = false; commandTimer.Stop(); SendStopCommand(); currentDirection = ""; e.Handled = true; }
             else if (e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
-            {
-                isFocusKeyPressed = false;
-                focusTimer.Stop();
-                SendFocusStopCommand();
-                string keyName = e.KeyCode == Keys.PageUp ? "PageUp" : "PageDown";
-                AddLogMessage($"{keyName} key released - stopped focus commands");
-                currentFocusDirection = "";
-                e.Handled = true;
-            }
+            { isFocusKeyPressed = false; focusTimer.Stop(); SendFocusStopCommand(); currentFocusDirection = ""; e.Handled = true; }
         }
 
-        private void BtnUp_MouseDown(object? sender, MouseEventArgs e)
-        {
-            currentDirection = "UP";
-            SendTelescopeCommand("UP");
-            commandTimer.Start();
-        }
+        private void BtnUp_MouseDown(object? sender, MouseEventArgs e) => StartDirection("UP");
+        private void BtnUp_MouseUp(object? sender, MouseEventArgs e) { commandTimer.Stop(); SendStopCommand(); currentDirection = ""; }
+        private void BtnDown_MouseDown(object? sender, MouseEventArgs e) => StartDirection("DOWN");
+        private void BtnDown_MouseUp(object? sender, MouseEventArgs e) { commandTimer.Stop(); SendStopCommand(); currentDirection = ""; }
+        private void BtnLeft_MouseDown(object? sender, MouseEventArgs e) => StartDirection("LEFT");
+        private void BtnLeft_MouseUp(object? sender, MouseEventArgs e) { commandTimer.Stop(); SendStopCommand(); currentDirection = ""; }
+        private void BtnRight_MouseDown(object? sender, MouseEventArgs e) => StartDirection("RIGHT");
+        private void BtnRight_MouseUp(object? sender, MouseEventArgs e) { commandTimer.Stop(); SendStopCommand(); currentDirection = ""; }
+        private void BtnFocusIncrease_MouseDown(object? sender, MouseEventArgs e) => StartFocus("INCREASE");
+        private void BtnFocusIncrease_MouseUp(object? sender, MouseEventArgs e) { focusTimer.Stop(); SendFocusStopCommand(); currentFocusDirection = ""; }
+        private void BtnFocusDecrease_MouseDown(object? sender, MouseEventArgs e) => StartFocus("DECREASE");
+        private void BtnFocusDecrease_MouseUp(object? sender, MouseEventArgs e) { focusTimer.Stop(); SendFocusStopCommand(); currentFocusDirection = ""; }
 
-        private void BtnUp_MouseUp(object? sender, MouseEventArgs e)
-        {
-            commandTimer.Stop();
-            SendStopCommand();
-            currentDirection = "";
-            AddLogMessage("UP button released - stopped sending commands");
-        }
+        private void FocusTimer_Tick(object? sender, EventArgs e) { if (!string.IsNullOrEmpty(currentFocusDirection)) SendFocusStepsCommand(); }
+        private void CommandTimer_Tick(object? sender, EventArgs e) { if (!string.IsNullOrEmpty(currentDirection)) SendStepsCommand(); }
 
-        private void BtnDown_MouseDown(object? sender, MouseEventArgs e)
+        private void OnServerDataReceived(string data)
         {
-            currentDirection = "DOWN";
-            SendTelescopeCommand("DOWN");
-            commandTimer.Start();
-        }
-
-        private void BtnDown_MouseUp(object? sender, MouseEventArgs e)
-        {
-            commandTimer.Stop();
-            SendStopCommand();
-            currentDirection = "";
-            AddLogMessage("DOWN button released - stopped sending commands");
-        }
-
-        private void BtnLeft_MouseDown(object? sender, MouseEventArgs e)
-        {
-            currentDirection = "LEFT";
-            SendTelescopeCommand("LEFT");
-            commandTimer.Start();
-        }
-
-        private void BtnLeft_MouseUp(object? sender, MouseEventArgs e)
-        {
-            commandTimer.Stop();
-            SendStopCommand();
-            currentDirection = "";
-            AddLogMessage("LEFT button released - stopped sending commands");
-        }
-
-        private void BtnRight_MouseDown(object? sender, MouseEventArgs e)
-        {
-            currentDirection = "RIGHT";
-            SendTelescopeCommand("RIGHT");
-            commandTimer.Start();
-        }
-
-        private void BtnRight_MouseUp(object? sender, MouseEventArgs e)
-        {
-            commandTimer.Stop();
-            SendStopCommand();
-            currentDirection = "";
-            AddLogMessage("RIGHT button released - stopped sending commands");
-        }
-
-        private void BtnFocusIncrease_MouseDown(object? sender, MouseEventArgs e)
-        {
-            currentFocusDirection = "INCREASE";
-            SendFocusCommand("INCREASE");
-            focusTimer.Start();
-        }
-
-        private void BtnFocusIncrease_MouseUp(object? sender, MouseEventArgs e)
-        {
-            focusTimer.Stop();
-            SendFocusStopCommand();
-            currentFocusDirection = "";
-            AddLogMessage("Focus INCREASE button released");
-        }
-
-        private void BtnFocusDecrease_MouseDown(object? sender, MouseEventArgs e)
-        {
-            currentFocusDirection = "DECREASE";
-            SendFocusCommand("DECREASE");
-            focusTimer.Start();
-        }
-
-        private void BtnFocusDecrease_MouseUp(object? sender, MouseEventArgs e)
-        {
-            focusTimer.Stop();
-            SendFocusStopCommand();
-            currentFocusDirection = "";
-            AddLogMessage("Focus DECREASE button released");
-        }
-
-        private void FocusTimer_Tick(object? sender, EventArgs e)
-        {
-            if (!string.IsNullOrEmpty(currentFocusDirection))
-            {
-                SendFocusStepsCommand();
-            }
-        }
-
-        private void ServerReadTimer_Tick(object? sender, EventArgs e)
-        {
-            if (serverClient == null || !serverClient.IsConnected())
-            {
-                return;
-            }
-
+            if (string.IsNullOrWhiteSpace(data)) return;
             try
             {
-                string data = serverClient.ReadExisting();
-                if (!string.IsNullOrEmpty(data))
-                {
-                    Debug.WriteLine($"Server Response: {data.Trim()}");
-                    // Display received data in log
-                    if (txtLog.InvokeRequired)
-                    {
-                        txtLog.Invoke(new Action(() =>
-                        {
-                            AddLogMessage($"Server Response: {data.Trim()}");
-                        }));
-                    }
-                    else
-                    {
-                        AddLogMessage($"Server Response: {data.Trim()}");
-                    }
-                }
+                string trimmed = data.Trim();
+                if (txtLog.InvokeRequired) txtLog.Invoke(new Action(() => AddLogMessage($"Server Response: {trimmed}")));
+                else AddLogMessage($"Server Response: {trimmed}");
             }
-            catch
-            {
-                // Silently ignore errors to avoid flooding the log
-                // Could optionally log errors less frequently
-            }
+            catch { }
         }
 
-        private void CommandTimer_Tick(object? sender, EventArgs e)
-        {
-            if (!string.IsNullOrEmpty(currentDirection))
-            {
-                SendStepsCommand();
-            }
-        }
-
-        private void btnUp_Click(object sender, EventArgs e)
-        {
-            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
-        }
-
-        private void btnDown_Click(object sender, EventArgs e)
-        {
-            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
-        }
-
-        private void btnLeft_Click(object sender, EventArgs e)
-        {
-            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
-        }
-
-        private void btnRight_Click(object sender, EventArgs e)
-        {
-            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
-        }
-
-        private void btnFocusIncrease_Click(object sender, EventArgs e)
-        {
-            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
-        }
-
-        private void btnFocusDecrease_Click(object sender, EventArgs e)
-        {
-            // Keep for compatibility but MouseDown/MouseUp will handle continuous commands
-        }
+        private void btnUp_Click(object sender, EventArgs e) { }
+        private void btnDown_Click(object sender, EventArgs e) { }
+        private void btnLeft_Click(object sender, EventArgs e) { }
+        private void btnRight_Click(object sender, EventArgs e) { }
+        private void btnFocusIncrease_Click(object sender, EventArgs e) { }
+        private void btnFocusDecrease_Click(object sender, EventArgs e) { }
 
         private void SendFocusCommand(string direction)
         {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    AddLogMessage("Error: Server connection is not available!");
-                    MessageBox.Show("Server is not connected.", "Connection Error", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    AddLogMessage("Error: Serial port is not open!");
-                    MessageBox.Show("Serial port is not connected.", "Connection Error", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-            }
-
+            if (!CheckConnection()) return;
             try
             {
-                // Set focus motor speed (b=xx where xx is 1-18)
-                string speedCommand = $"b={focusSpeed}";
-                WriteCommand(speedCommand);
-                AddLogMessage($"Sending: b={focusSpeed} (Focus Speed: {focusSpeed})");
-                Thread.Sleep(50);
-
-                // Set focus direction (a=x where x is 0 or 1)
-                string directionCommand;
-                if (direction == "INCREASE")
-                {
-                    directionCommand = "a=1";
-                    AddLogMessage("Sending: a=1 (Focus Direction: INCREASE/FAR)");
-                }
-                else // DECREASE
-                {
-                    directionCommand = "a=0";
-                    AddLogMessage("Sending: a=0 (Focus Direction: DECREASE/NEAR)");
-                }
-                WriteCommand(directionCommand);
-                Thread.Sleep(50);
-
-                // Send focus steps command (c=100 for 100 steps)
-                string stepsCommand = "c=100";
-                WriteCommand(stepsCommand);
-                AddLogMessage("Sending: c=100 (Focus Steps: 100)");
+                WriteCommand($"b={focusSpeed}"); Thread.Sleep(50);
+                WriteCommand(direction == "INCREASE" ? "a=1" : "a=0"); Thread.Sleep(50);
+                WriteCommand("c=100");
             }
-            catch (Exception ex)
-            {
-                AddLogMessage($"Error sending focus command: {ex.Message}");
-                MessageBox.Show($"Failed to send focus command.\r\n\r\nError: {ex.Message}", 
-                    "Communication Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            catch (Exception ex) { AddLogMessage($"Error: {ex.Message}"); }
         }
 
-        private void SendFocusStepsCommand()
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    focusTimer.Stop();
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    focusTimer.Stop();
-                    return;
-                }
-            }
-
-            try
-            {
-                // Send only focus steps command (direction and speed already set)
-                string stepsCommand = "c=100";
-                WriteCommand(stepsCommand);
-                AddLogMessage("Sending: c=100 (Focus Steps: 100)");
-            }
-            catch (Exception ex)
-            {
-                AddLogMessage($"Error sending focus steps command: {ex.Message}");
-                focusTimer.Stop();
-            }
-        }
-
-        private void SendFocusStopCommand()
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    return;
-                }
-            }
-
-            try
-            {
-                // Send focus stop command (c=0 for 0 steps)
-                string stopCommand = "c=0";
-                WriteCommand(stopCommand);
-                AddLogMessage("Sending: c=0 (Focus STOP)");
-            }
-            catch (Exception ex)
-            {
-                AddLogMessage($"Error sending focus stop command: {ex.Message}");
-            }
-        }
+        private void SendFocusStepsCommand() { if (CheckConnection()) try { WriteCommand("c=100"); } catch { focusTimer.Stop(); } }
+        private void SendFocusStopCommand() { if (CheckConnection()) try { WriteCommand("c=0"); } catch { } }
 
         private void SendTelescopeCommand(string direction)
         {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    AddLogMessage("Error: Server connection is not available!");
-                    MessageBox.Show("Server is not connected.", "Connection Error", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    AddLogMessage("Error: Serial port is not open!");
-                    MessageBox.Show("Serial port is not connected.", "Connection Error", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-            }
-
+            if (!CheckConnection()) return;
             try
             {
-                string motorCommand;
-                string directionCommand;
-                
-                // Determine motor selection and direction based on command
-                if (direction == "UP")
-                {
-                    motorCommand = "v=0"; // Up/Down motor
-                    directionCommand = "d=0";
-                    AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                    AddLogMessage("Sending: d=1 (Direction: UP)");
-                }
-                else if (direction == "DOWN")
-                {
-                    motorCommand = "v=0"; // Up/Down motor
-                    directionCommand = "d=1";
-                    AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                    AddLogMessage("Sending: d=0 (Direction: DOWN)");
-                }
-                else if (direction == "LEFT")
-                {
-                    motorCommand = "v=1"; // Left/Right motor
-                    directionCommand = "d=0";
-                    AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                    AddLogMessage("Sending: d=0 (Direction: LEFT)");
-                }
-                else // RIGHT
-                {
-                    motorCommand = "v=1"; // Left/Right motor
-                    directionCommand = "d=1";
-                    AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                    AddLogMessage("Sending: d=1 (Direction: RIGHT)");
-                }
-
-                // Send direction command
-                WriteCommand(directionCommand);
-                Thread.Sleep(50); // Small delay between commands
-
-                // Send time between steps command
-                string timeCommand;
-                string timeDisplay;
-                
-                // Handle special case for 10000 steps/second (t=0.1)
-                if (timeBetweenSteps == 0)
-                {
-                    timeCommand = "t=0.1";
-                    timeDisplay = "0.1";
-                }
-                else
-                {
-                    timeCommand = $"t={timeBetweenSteps}";
-                    timeDisplay = timeBetweenSteps.ToString();
-                }
-                
-                WriteCommand(timeCommand);
-                AddLogMessage($"Sending: {timeCommand} (Time: {timeDisplay}ms)");
-                Thread.Sleep(50); // Small delay between commands
-
-                // Send steps command
-                string stepsCommand = "s=10000";
-                WriteCommand(stepsCommand);
-                AddLogMessage("Sending: s=10000 (Steps: 10000)");
+                WriteCommand((direction == "UP" || direction == "DOWN") ? "v=0" : "v=1"); Thread.Sleep(50);
+                WriteCommand((direction == "UP" || direction == "LEFT") ? "d=0" : "d=1"); Thread.Sleep(50);
+                WriteCommand(timeBetweenSteps == 0 ? "t=0.1" : $"t={timeBetweenSteps}"); Thread.Sleep(50);
+                WriteCommand("s=10000");
             }
-            catch (Exception ex)
-            {
-                AddLogMessage($"Error sending command: {ex.Message}");
-                MessageBox.Show($"Failed to send command.\r\n\r\nError: {ex.Message}", 
-                    "Communication Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            catch (Exception ex) { AddLogMessage($"Error: {ex.Message}"); }
         }
 
-        private void SendStepsCommand()
+        private void SendStepsCommand() { if (CheckConnection()) try { WriteCommand("s=10000"); } catch { commandTimer.Stop(); } }
+        private void SendStopCommand() { if (CheckConnection()) try { WriteCommand("s=0"); } catch { } }
+
+        private bool CheckConnection()
         {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    commandTimer.Stop();
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    commandTimer.Stop();
-                    return;
-                }
-            }
-
-            try
-            {
-                // Send only steps command (direction already set)
-                string stepsCommand = "s=10000";
-                WriteCommand(stepsCommand);
-                AddLogMessage("Sending: s=10000 (Steps: 10000)");
-            }
-            catch (Exception ex)
-            {
-                AddLogMessage($"Error sending command: {ex.Message}");
-                commandTimer.Stop();
-            }
-        }
-
-        private void SendStopCommand()
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    return;
-                }
-            }
-
-            try
-            {
-                // Send stop command
-                string stopCommand = "s=0";
-                WriteCommand(stopCommand);
-                AddLogMessage("Sending: s=0 (STOP)");
-            }
-            catch (Exception ex)
-            {
-                AddLogMessage($"Error sending stop command: {ex.Message}");
-            }
+            if (isServerMode) return serverClient != null && serverClient.IsConnected();
+            return serialPort != null && serialPort.IsOpen;
         }
 
         private void WriteCommand(string command)
         {
-            if (isServerMode)
-            {
-                serverClient?.WriteLine(command);
-            }
-            else
-            {
-                serialPort?.WriteLine(command);
-            }
+            if (isServerMode) serverClient?.WriteLine(command);
+            else serialPort?.WriteLine(command);
         }
 
         private void AddLogMessage(string message)
         {
-            string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            if (txtLog.InvokeRequired)
-            {
-                txtLog.Invoke(new Action(() =>
-                {
-                    txtLog.AppendText($"[{timestamp}] {message}\r\n");
-                }));
-            }
-            else
-            {
-                txtLog.AppendText($"[{timestamp}] {message}\r\n");
-            }
+            string ts = DateTime.Now.ToString("HH:mm:ss");
+            if (txtLog.InvokeRequired) txtLog.Invoke(new Action(() => txtLog.AppendText($"[{ts}] {message}\r\n")));
+            else txtLog.AppendText($"[{ts}] {message}\r\n");
         }
 
         private void TelescopeControlForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            // Stop timers and cleanup
-            commandTimer?.Stop();
-            commandTimer?.Dispose();
-            focusTimer?.Stop();
-            focusTimer?.Dispose();
-            
-            if (isServerMode && serverReadTimer != null)
-            {
-                serverReadTimer.Stop();
-                serverReadTimer.Dispose();
-                AddLogMessage("Server read polling stopped");
-            }
-            
-            // Cleanup server client if in server mode
-            if (isServerMode && serverClient != null)
-            {
-                serverClient.Dispose();
-            }
-            
-            // Don't close the serial port here - let the main form handle it
-            AddLogMessage("Telescope control window closed.");
+            commandTimer?.Stop(); commandTimer?.Dispose();
+            focusTimer?.Stop(); focusTimer?.Dispose();
+            videoStatusTimer?.Stop(); videoStatusTimer?.Dispose();
+            videoHttpClient?.Dispose();
+            if (isServerMode && serverClient != null) { serverClient.StopStreaming(); serverClient.Dispose(); }
         }
     }
 }
