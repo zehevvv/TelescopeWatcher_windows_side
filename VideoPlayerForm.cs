@@ -9,6 +9,9 @@ namespace TelescopeWatcher
         private Button btnClose;
         private Label lblStatus;
         private Label lblFrameInfo;
+        private CheckBox chkFlipHorizontal;
+        private CheckBox chkFlipVertical;
+        private Panel controlPanel;
         private readonly string mjpegUrl;
         private HttpClient? httpClient;
         private CancellationTokenSource? cancellationToken;
@@ -16,6 +19,8 @@ namespace TelescopeWatcher
         private bool isStreaming = false;
         private int frameCount = 0;
         private DateTime lastFrameTime = DateTime.Now;
+        private bool flipHorizontal = true;  // Default: flip horizontal
+        private bool flipVertical = true;    // Default: flip vertical
 
         public VideoPlayerForm(string serverUrl)
         {
@@ -43,6 +48,42 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
             };
+
+            // Control panel for flip options
+            controlPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 35,
+                BackColor = System.Drawing.Color.FromArgb(45, 45, 48),
+                Padding = new Padding(10, 5, 10, 5)
+            };
+
+            // Horizontal flip checkbox
+            chkFlipHorizontal = new CheckBox
+            {
+                Text = "Flip Horizontal",
+                Checked = true,  // Default: enabled
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(10, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+            chkFlipHorizontal.CheckedChanged += ChkFlipHorizontal_CheckedChanged;
+
+            // Vertical flip checkbox
+            chkFlipVertical = new CheckBox
+            {
+                Text = "Flip Vertical",
+                Checked = true,  // Default: enabled
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(150, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+            chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
+
+            controlPanel.Controls.Add(chkFlipHorizontal);
+            controlPanel.Controls.Add(chkFlipVertical);
 
             // Frame info label
             lblFrameInfo = new Label
@@ -78,6 +119,7 @@ namespace TelescopeWatcher
             btnClose.Click += BtnClose_Click;
 
             this.Controls.Add(pictureBox);
+            this.Controls.Add(controlPanel);
             this.Controls.Add(lblStatus);
             this.Controls.Add(lblFrameInfo);
             this.Controls.Add(btnClose);
@@ -175,7 +217,32 @@ namespace TelescopeWatcher
                                             {
                                                 using var ms = new MemoryStream(jpegData);
                                                 var image = Image.FromStream(ms);
-                                                UpdateImage(image);
+                                                
+                                                // Apply flip transformations based on user settings
+                                                if (flipHorizontal || flipVertical)
+                                                {
+                                                    var bitmap = new Bitmap(image);
+                                                    
+                                                    if (flipHorizontal && flipVertical)
+                                                    {
+                                                        bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
+                                                    }
+                                                    else if (flipHorizontal)
+                                                    {
+                                                        bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                                                    }
+                                                    else if (flipVertical)
+                                                    {
+                                                        bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
+                                                    }
+                                                    
+                                                    UpdateImage(bitmap);
+                                                    image.Dispose();
+                                                }
+                                                else
+                                                {
+                                                    UpdateImage(image);
+                                                }
                                                 
                                                 frameCount++;
                                                 var now = DateTime.Now;
@@ -293,6 +360,18 @@ namespace TelescopeWatcher
             cancellationToken?.Dispose();
             httpClient?.Dispose();
             pictureBox?.Image?.Dispose();
+        }
+
+        private void ChkFlipHorizontal_CheckedChanged(object? sender, EventArgs e)
+        {
+            flipHorizontal = chkFlipHorizontal.Checked;
+            System.Diagnostics.Debug.WriteLine($"Flip Horizontal: {flipHorizontal}");
+        }
+
+        private void ChkFlipVertical_CheckedChanged(object? sender, EventArgs e)
+        {
+            flipVertical = chkFlipVertical.Checked;
+            System.Diagnostics.Debug.WriteLine($"Flip Vertical: {flipVertical}");
         }
     }
 }
