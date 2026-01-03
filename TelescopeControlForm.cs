@@ -21,6 +21,7 @@ namespace TelescopeWatcher
         private bool isServerMode = false;
         private string? videoServerUrl;
         private HttpClient? videoHttpClient;
+        private VideoPlayerForm? videoPlayerForm;
         
         // Steps per second values corresponding to trackbar positions
         private readonly int[] stepsPerSecondValues = { 3, 1, 10, 100, 1000, 10000 };
@@ -168,21 +169,59 @@ namespace TelescopeWatcher
                 {
                     AddLogMessage("Video stream started successfully");
                     UpdateVideoStatus(true, "Streaming");
+                    
+                    // Open video player window
+                    if (videoPlayerForm == null || videoPlayerForm.IsDisposed)
+                    {
+                        try
+                        {
+                            // Extract base URL without port for video player
+                            var uri = new Uri(videoServerUrl);
+                            string baseUrl = $"{uri.Scheme}://{uri.Host}";
+                            
+                            videoPlayerForm = new VideoPlayerForm(baseUrl);
+                            videoPlayerForm.Show();
+                            videoPlayerForm.FormClosed += (s, args) =>
+                            {
+                                videoPlayerForm = null;
+                                AddLogMessage("Video player window closed");
+                            };
+                            
+                            AddLogMessage($"Video player opened - streaming from {baseUrl}:8080");
+                        }
+                        catch (Exception ex)
+                        {
+                            AddLogMessage($"Error opening video player: {ex.Message}");
+                            MessageBox.Show($"Failed to open video player:\n\n{ex.Message}", 
+                                "Video Player Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    else
+                    {
+                        videoPlayerForm.BringToFront();
+                        AddLogMessage("Video player already open");
+                    }
                 }
                 else
                 {
                     string error = await response.Content.ReadAsStringAsync();
                     AddLogMessage($"Failed to start video stream: {error}");
+                    MessageBox.Show($"Failed to start video stream.\n\nServer response: {error}", 
+                        "Stream Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             catch (TaskCanceledException)
             {
                 AddLogMessage("Video start request timed out");
                 UpdateVideoStatus(false, "Timeout");
+                MessageBox.Show("Video start request timed out.\n\nThe server may be busy or unreachable.", 
+                    "Timeout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
             {
                 AddLogMessage($"Error starting video stream: {ex.Message}");
+                MessageBox.Show($"Error starting video stream:\n\n{ex.Message}", 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -202,6 +241,14 @@ namespace TelescopeWatcher
             {
                 btnVideoStop.Enabled = false;
                 AddLogMessage("Stopping video stream...");
+                
+                // Close video player window if open
+                if (videoPlayerForm != null && !videoPlayerForm.IsDisposed)
+                {
+                    videoPlayerForm.Close();
+                    videoPlayerForm = null;
+                    AddLogMessage("Video player window closed");
+                }
                 
                 var response = await videoHttpClient.GetAsync($"{videoServerUrl}/stop");
                 
@@ -867,6 +914,13 @@ namespace TelescopeWatcher
             videoStatusTimer?.Stop();
             videoStatusTimer?.Dispose();
             videoHttpClient?.Dispose();
+            
+            // Close video player window if open
+            if (videoPlayerForm != null && !videoPlayerForm.IsDisposed)
+            {
+                videoPlayerForm.Close();
+                videoPlayerForm = null;
+            }
             
             serverClient?.Dispose();
         }
