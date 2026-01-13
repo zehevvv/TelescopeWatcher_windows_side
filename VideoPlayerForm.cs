@@ -30,6 +30,8 @@ namespace TelescopeWatcher
         private int frameCount2 = 0;
         private DateTime lastFrameTime1 = DateTime.Now;
         private DateTime lastFrameTime2 = DateTime.Now;
+        private DateTime lastFpsUpdate1 = DateTime.Now;
+        private DateTime lastFpsUpdate2 = DateTime.Now;
         private bool flipHorizontal = true;
         private bool flipVertical = true;
 
@@ -48,6 +50,12 @@ namespace TelescopeWatcher
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable;
             this.MinimumSize = new System.Drawing.Size(600, 400);
+            
+            // Enable double buffering to reduce flicker
+            this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.OptimizedDoubleBuffer | 
+                          ControlStyles.AllPaintingInWmPaint | 
+                          ControlStyles.UserPaint, true);
 
             // Status label
             lblStatus = new Label
@@ -377,7 +385,13 @@ namespace TelescopeWatcher
                                                 if (elapsed > 0)
                                                 {
                                                     double fps = 1.0 / elapsed;
-                                                    UpdateFrameInfo(frameCount1, fps, 1);
+                                                    
+                                                    // Only update FPS display every 500ms to reduce flicker
+                                                    if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
+                                                    {
+                                                        UpdateFrameInfo(frameCount1, fps, 1);
+                                                        lastFpsUpdate1 = now;
+                                                    }
                                                 }
                                                 lastFrameTime1 = now;
                                             }
@@ -389,7 +403,13 @@ namespace TelescopeWatcher
                                                 if (elapsed > 0)
                                                 {
                                                     double fps = 1.0 / elapsed;
-                                                    UpdateFrameInfo(frameCount2, fps, 2);
+                                                    
+                                                    // Only update FPS display every 500ms to reduce flicker
+                                                    if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
+                                                    {
+                                                        UpdateFrameInfo(frameCount2, fps, 2);
+                                                        lastFpsUpdate2 = now;
+                                                    }
                                                 }
                                                 lastFrameTime2 = now;
                                             }
@@ -458,6 +478,7 @@ namespace TelescopeWatcher
         {
             var label = streamId == 1 ? lblFrameInfo1 : lblFrameInfo2;
             string cameraName = streamId == 1 ? "Main" : "Secondary";
+            string newText = $"{cameraName}: Frame {frames} | FPS: {fps:F1}";
             
             if (label.InvokeRequired)
             {
@@ -465,7 +486,11 @@ namespace TelescopeWatcher
                 return;
             }
 
-            label.Text = $"{cameraName}: Frame {frames} | FPS: {fps:F1}";
+            // Only update if text actually changed to reduce flicker
+            if (label.Text != newText)
+            {
+                label.Text = newText;
+            }
         }
 
         private void BtnClose_Click(object? sender, EventArgs e)
