@@ -8,7 +8,7 @@ namespace TelescopeWatcher
         private string? selectedPort;
         private TelescopeControlForm? telescopeControlForm;
         private bool isServerMode = true; // Default to server mode
-        private string serverUrl = "http://192.168.0.211:5002";
+        private string serverUrl = "http://192.168.4.1:5002";
 
         public MainForm()
         {
@@ -19,7 +19,7 @@ namespace TelescopeWatcher
         {
             RefreshPortList();
             UpdateUIForConnectionMode();
-            AddStatusMessage("Application started. Default mode: HTTP Server (192.168.0.211:5002)");
+            AddStatusMessage("Application started. Default mode: HTTP Server (192.168.4.1:5002)");
         }
 
         private void radioSerial_CheckedChanged(object sender, EventArgs e)

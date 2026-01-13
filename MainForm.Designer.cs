@@ -131,7 +131,7 @@ namespace TelescopeWatcher
             this.txtServerUrl.Name = "txtServerUrl";
             this.txtServerUrl.Size = new System.Drawing.Size(212, 23);
             this.txtServerUrl.TabIndex = 3;
-            this.txtServerUrl.Text = "192.168.0.211";
+            this.txtServerUrl.Text = "192.168.4.1";
             // 
             // lblServerUrl
             // 
