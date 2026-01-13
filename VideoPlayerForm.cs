@@ -213,13 +213,18 @@ namespace TelescopeWatcher
         {
             if (radioMainOnly.Checked)
             {
+                pictureBox1.Visible = true;
                 pictureBox1.Dock = DockStyle.Fill;
                 pictureBox2.Visible = false;
+                pictureBox2.Dock = DockStyle.None;  // Reset dock
+                lblFrameInfo1.Visible = true;
                 lblFrameInfo2.Visible = false;
             }
             else if (radioSecondaryOnly.Checked)
             {
                 pictureBox1.Visible = false;
+                pictureBox1.Dock = DockStyle.None;  // Reset dock
+                pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Fill;
                 lblFrameInfo1.Visible = false;
                 lblFrameInfo2.Visible = true;
