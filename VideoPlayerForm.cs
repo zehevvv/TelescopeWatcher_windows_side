@@ -5,26 +5,38 @@ namespace TelescopeWatcher
 {
     public partial class VideoPlayerForm : Form
     {
-        private PictureBox pictureBox;
+        private PictureBox pictureBox1;
+        private PictureBox pictureBox2;
+        private Panel videoPanel;
         private Button btnClose;
         private Label lblStatus;
-        private Label lblFrameInfo;
+        private Label lblFrameInfo1;
+        private Label lblFrameInfo2;
         private CheckBox chkFlipHorizontal;
         private CheckBox chkFlipVertical;
+        private RadioButton radioMainOnly;
+        private RadioButton radioSecondaryOnly;
+        private RadioButton radioBoth;
         private Panel controlPanel;
-        private readonly string mjpegUrl;
-        private HttpClient? httpClient;
+        private readonly string mjpegUrl1;
+        private readonly string mjpegUrl2;
+        private HttpClient? httpClient1;
+        private HttpClient? httpClient2;
         private CancellationTokenSource? cancellationToken;
-        private Task? streamTask;
+        private Task? streamTask1;
+        private Task? streamTask2;
         private bool isStreaming = false;
-        private int frameCount = 0;
-        private DateTime lastFrameTime = DateTime.Now;
-        private bool flipHorizontal = true;  // Default: flip horizontal
-        private bool flipVertical = true;    // Default: flip vertical
+        private int frameCount1 = 0;
+        private int frameCount2 = 0;
+        private DateTime lastFrameTime1 = DateTime.Now;
+        private DateTime lastFrameTime2 = DateTime.Now;
+        private bool flipHorizontal = true;
+        private bool flipVertical = true;
 
         public VideoPlayerForm(string serverUrl)
         {
-            this.mjpegUrl = $"{serverUrl}:8080/?action=stream";
+            this.mjpegUrl1 = $"{serverUrl}:8080/?action=stream";
+            this.mjpegUrl2 = $"{serverUrl}:8081/?action=stream";
             InitializeComponent();
             this.FormClosing += VideoPlayerForm_FormClosing;
         }
@@ -32,15 +44,15 @@ namespace TelescopeWatcher
         private void InitializeComponent()
         {
             this.Text = "Video Stream - MJPEG";
-            this.Size = new System.Drawing.Size(800, 600);
+            this.Size = new System.Drawing.Size(1200, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable;
-            this.MinimumSize = new System.Drawing.Size(400, 300);
+            this.MinimumSize = new System.Drawing.Size(600, 400);
 
             // Status label
             lblStatus = new Label
             {
-                Text = "Connecting to stream...",
+                Text = "Connecting to streams...",
                 Dock = DockStyle.Top,
                 Height = 30,
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
@@ -49,7 +61,7 @@ namespace TelescopeWatcher
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
             };
 
-            // Control panel for flip options
+            // Control panel for options
             controlPanel = new Panel
             {
                 Dock = DockStyle.Top,
@@ -58,14 +70,48 @@ namespace TelescopeWatcher
                 Padding = new Padding(10, 5, 10, 5)
             };
 
-            // Horizontal flip checkbox
-            chkFlipHorizontal = new CheckBox
+            // Stream selection radio buttons
+            radioMainOnly = new RadioButton
             {
-                Text = "Flip Horizontal",
-                Checked = true,  // Default: enabled
+                Text = "Main Camera",
+                Checked = false,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
                 Location = new System.Drawing.Point(10, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+            radioMainOnly.CheckedChanged += RadioStream_CheckedChanged;
+
+            radioSecondaryOnly = new RadioButton
+            {
+                Text = "Secondary Camera",
+                Checked = false,
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(130, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+            radioSecondaryOnly.CheckedChanged += RadioStream_CheckedChanged;
+
+            radioBoth = new RadioButton
+            {
+                Text = "Both Cameras",
+                Checked = true,
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(280, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+            radioBoth.CheckedChanged += RadioStream_CheckedChanged;
+
+            // Horizontal flip checkbox
+            chkFlipHorizontal = new CheckBox
+            {
+                Text = "Flip H",
+                Checked = true,
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(420, 8),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             chkFlipHorizontal.CheckedChanged += ChkFlipHorizontal_CheckedChanged;
@@ -73,37 +119,72 @@ namespace TelescopeWatcher
             // Vertical flip checkbox
             chkFlipVertical = new CheckBox
             {
-                Text = "Flip Vertical",
-                Checked = true,  // Default: enabled
+                Text = "Flip V",
+                Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(150, 8),
+                Location = new System.Drawing.Point(500, 8),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
 
+            controlPanel.Controls.Add(radioMainOnly);
+            controlPanel.Controls.Add(radioSecondaryOnly);
+            controlPanel.Controls.Add(radioBoth);
             controlPanel.Controls.Add(chkFlipHorizontal);
             controlPanel.Controls.Add(chkFlipVertical);
 
-            // Frame info label
-            lblFrameInfo = new Label
-            {
-                Text = "Frame: 0 | FPS: 0.0",
-                Dock = DockStyle.Bottom,
-                Height = 25,
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-                BackColor = System.Drawing.Color.Black,
-                ForeColor = System.Drawing.Color.LightGray,
-                Font = new System.Drawing.Font("Segoe UI", 9F)
-            };
-
-            // Picture box for video
-            pictureBox = new PictureBox
+            // Video panel container
+            videoPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = System.Drawing.Color.Black
             };
+
+            // Picture box 1 (Main camera)
+            pictureBox1 = new PictureBox
+            {
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = System.Drawing.Color.Black,
+                Dock = DockStyle.Fill
+            };
+
+            // Picture box 2 (Secondary camera)
+            pictureBox2 = new PictureBox
+            {
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = System.Drawing.Color.Black,
+                Dock = DockStyle.Right,
+                Width = 600
+            };
+
+            // Frame info labels
+            lblFrameInfo1 = new Label
+            {
+                Text = "Main: Frame 0 | FPS: 0.0",
+                Height = 25,
+                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+                BackColor = System.Drawing.Color.Black,
+                ForeColor = System.Drawing.Color.LightGray,
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                Padding = new Padding(10, 0, 0, 0),
+                Dock = DockStyle.Bottom
+            };
+
+            lblFrameInfo2 = new Label
+            {
+                Text = "Secondary: Frame 0 | FPS: 0.0",
+                Height = 25,
+                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+                BackColor = System.Drawing.Color.Black,
+                ForeColor = System.Drawing.Color.LightGray,
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                Padding = new Padding(10, 0, 0, 0),
+                Dock = DockStyle.Bottom
+            };
+
+            videoPanel.Controls.Add(pictureBox1);
+            videoPanel.Controls.Add(pictureBox2);
 
             // Close button
             btnClose = new Button
@@ -118,13 +199,41 @@ namespace TelescopeWatcher
             };
             btnClose.Click += BtnClose_Click;
 
-            this.Controls.Add(pictureBox);
+            this.Controls.Add(videoPanel);
             this.Controls.Add(controlPanel);
             this.Controls.Add(lblStatus);
-            this.Controls.Add(lblFrameInfo);
+            this.Controls.Add(lblFrameInfo1);
+            this.Controls.Add(lblFrameInfo2);
             this.Controls.Add(btnClose);
 
             this.Load += VideoPlayerForm_Load;
+        }
+
+        private void RadioStream_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (radioMainOnly.Checked)
+            {
+                pictureBox1.Dock = DockStyle.Fill;
+                pictureBox2.Visible = false;
+                lblFrameInfo2.Visible = false;
+            }
+            else if (radioSecondaryOnly.Checked)
+            {
+                pictureBox1.Visible = false;
+                pictureBox2.Dock = DockStyle.Fill;
+                lblFrameInfo1.Visible = false;
+                lblFrameInfo2.Visible = true;
+            }
+            else if (radioBoth.Checked)
+            {
+                pictureBox1.Visible = true;
+                pictureBox1.Dock = DockStyle.Fill;
+                pictureBox2.Visible = true;
+                pictureBox2.Dock = DockStyle.Right;
+                pictureBox2.Width = this.ClientSize.Width / 2;
+                lblFrameInfo1.Visible = true;
+                lblFrameInfo2.Visible = true;
+            }
         }
 
         private async void VideoPlayerForm_Load(object? sender, EventArgs e)
@@ -136,175 +245,190 @@ namespace TelescopeWatcher
         {
             try
             {
-                UpdateStatus($"Connecting to {mjpegUrl}...", System.Drawing.Color.DarkOrange);
-                System.Diagnostics.Debug.WriteLine($"MJPEG URL: {mjpegUrl}");
-
-                httpClient = new HttpClient();
-                httpClient.Timeout = TimeSpan.FromMinutes(5);
+                UpdateStatus("Connecting to streams...", System.Drawing.Color.DarkOrange);
+                
+                httpClient1 = new HttpClient();
+                httpClient1.Timeout = TimeSpan.FromMinutes(5);
+                httpClient2 = new HttpClient();
+                httpClient2.Timeout = TimeSpan.FromMinutes(5);
+                
                 cancellationToken = new CancellationTokenSource();
-
                 isStreaming = true;
 
-                streamTask = Task.Run(async () =>
-                {
-                    try
-                    {
-                        var request = new HttpRequestMessage(HttpMethod.Get, mjpegUrl);
-                        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken.Token);
+                // Start both streams
+                streamTask1 = StartStreamTask(mjpegUrl1, 1);
+                streamTask2 = StartStreamTask(mjpegUrl2, 2);
 
-                        if (!response.IsSuccessStatusCode)
-                        {
-                            UpdateStatus($"Error: HTTP {response.StatusCode}", System.Drawing.Color.DarkRed);
-                            System.Diagnostics.Debug.WriteLine($"HTTP Error: {response.StatusCode}");
-                            return;
-                        }
-
-                        UpdateStatus("Stream connected - receiving frames...", System.Drawing.Color.DarkGreen);
-                        System.Diagnostics.Debug.WriteLine("Stream connected successfully");
-                        System.Diagnostics.Debug.WriteLine($"Content-Type: {response.Content.Headers.ContentType}");
-
-                        using var stream = await response.Content.ReadAsStreamAsync();
-                        
-                        byte[] buffer = new byte[1024];
-                        List<byte> frameBuffer = new List<byte>();
-                        
-                        while (!cancellationToken.Token.IsCancellationRequested)
-                        {
-                            try
-                            {
-                                int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken.Token);
-                                
-                                if (bytesRead == 0)
-                                {
-                                    UpdateStatus("Stream ended", System.Drawing.Color.DarkRed);
-                                    break;
-                                }
-
-                                // Add bytes to frame buffer
-                                for (int i = 0; i < bytesRead; i++)
-                                {
-                                    frameBuffer.Add(buffer[i]);
-                                    
-                                    // Check if we have at least 2 bytes
-                                    if (frameBuffer.Count < 2)
-                                        continue;
-                                    
-                                    int len = frameBuffer.Count;
-                                    
-                                    // Look for JPEG end marker (FF D9)
-                                    if (frameBuffer[len - 2] == 0xFF && frameBuffer[len - 1] == 0xD9)
-                                    {
-                                        // Found complete JPEG frame
-                                        // Now find the start marker (FF D8)
-                                        int startIndex = -1;
-                                        for (int j = 0; j < frameBuffer.Count - 1; j++)
-                                        {
-                                            if (frameBuffer[j] == 0xFF && frameBuffer[j + 1] == 0xD8)
-                                            {
-                                                startIndex = j;
-                                                break;
-                                            }
-                                        }
-                                        
-                                        if (startIndex >= 0)
-                                        {
-                                            // Extract complete JPEG (from start to end marker)
-                                            int frameLength = len - startIndex;
-                                            byte[] jpegData = new byte[frameLength];
-                                            frameBuffer.CopyTo(startIndex, jpegData, 0, frameLength);
-                                            
-                                            try
-                                            {
-                                                using var ms = new MemoryStream(jpegData);
-                                                var image = Image.FromStream(ms);
-                                                
-                                                // Apply flip transformations based on user settings
-                                                if (flipHorizontal || flipVertical)
-                                                {
-                                                    var bitmap = new Bitmap(image);
-                                                    
-                                                    if (flipHorizontal && flipVertical)
-                                                    {
-                                                        bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
-                                                    }
-                                                    else if (flipHorizontal)
-                                                    {
-                                                        bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
-                                                    }
-                                                    else if (flipVertical)
-                                                    {
-                                                        bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
-                                                    }
-                                                    
-                                                    UpdateImage(bitmap);
-                                                    image.Dispose();
-                                                }
-                                                else
-                                                {
-                                                    UpdateImage(image);
-                                                }
-                                                
-                                                frameCount++;
-                                                var now = DateTime.Now;
-                                                var elapsed = (now - lastFrameTime).TotalSeconds;
-                                                if (elapsed > 0)
-                                                {
-                                                    double fps = 1.0 / elapsed;
-                                                    UpdateFrameInfo(frameCount, fps);
-                                                }
-                                                lastFrameTime = now;
-                                                
-                                                System.Diagnostics.Debug.WriteLine($"Frame {frameCount} decoded successfully ({jpegData.Length} bytes)");
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                System.Diagnostics.Debug.WriteLine($"Error decoding frame: {ex.Message} (data length: {jpegData.Length})");
-                                            }
-                                        }
-                                        
-                                        // Clear buffer after processing frame
-                                        frameBuffer.Clear();
-                                    }
-                                    
-                                    // Prevent buffer from growing too large (keep last 500KB)
-                                    if (frameBuffer.Count > 500000)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine("Buffer overflow - clearing");
-                                        frameBuffer.Clear();
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Frame read error: {ex.Message}");
-                                frameBuffer.Clear();
-                            }
-                        }
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        UpdateStatus("Stream stopped", System.Drawing.Color.Gray);
-                    }
-                    catch (Exception ex)
-                    {
-                        UpdateStatus($"Error: {ex.Message}", System.Drawing.Color.DarkRed);
-                        System.Diagnostics.Debug.WriteLine($"Stream error: {ex}");
-                    }
-                }, cancellationToken.Token);
+                UpdateStatus("Streams connected - receiving frames...", System.Drawing.Color.DarkGreen);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to start video stream:\n\n{ex.Message}\n\nURL: {mjpegUrl}", 
+                MessageBox.Show($"Failed to start video streams:\n\n{ex.Message}", 
                     "Stream Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 this.Close();
             }
         }
 
-        private void UpdateImage(Image image)
+        private Task StartStreamTask(string mjpegUrl, int streamId)
         {
+            return Task.Run(async () =>
+            {
+                var httpClient = streamId == 1 ? httpClient1 : httpClient2;
+                
+                try
+                {
+                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - URL: {mjpegUrl}");
+                    
+                    var request = new HttpRequestMessage(HttpMethod.Get, mjpegUrl);
+                    var response = await httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken!.Token);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Stream {streamId} - HTTP Error: {response.StatusCode}");
+                        return;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Connected successfully");
+
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    
+                    byte[] buffer = new byte[1024];
+                    List<byte> frameBuffer = new List<byte>();
+                    
+                    while (!cancellationToken.Token.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken.Token);
+                            
+                            if (bytesRead == 0)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Ended");
+                                break;
+                            }
+
+                            for (int i = 0; i < bytesRead; i++)
+                            {
+                                frameBuffer.Add(buffer[i]);
+                                
+                                if (frameBuffer.Count < 2)
+                                    continue;
+                                
+                                int len = frameBuffer.Count;
+                                
+                                if (frameBuffer[len - 2] == 0xFF && frameBuffer[len - 1] == 0xD9)
+                                {
+                                    int startIndex = -1;
+                                    for (int j = 0; j < frameBuffer.Count - 1; j++)
+                                    {
+                                        if (frameBuffer[j] == 0xFF && frameBuffer[j + 1] == 0xD8)
+                                        {
+                                            startIndex = j;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (startIndex >= 0)
+                                    {
+                                        int frameLength = len - startIndex;
+                                        byte[] jpegData = new byte[frameLength];
+                                        frameBuffer.CopyTo(startIndex, jpegData, 0, frameLength);
+                                        
+                                        try
+                                        {
+                                            using var ms = new MemoryStream(jpegData);
+                                            var image = Image.FromStream(ms);
+                                            
+                                            if (flipHorizontal || flipVertical)
+                                            {
+                                                var bitmap = new Bitmap(image);
+                                                
+                                                if (flipHorizontal && flipVertical)
+                                                {
+                                                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
+                                                }
+                                                else if (flipHorizontal)
+                                                {
+                                                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                                                }
+                                                else if (flipVertical)
+                                                {
+                                                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
+                                                }
+                                                
+                                                UpdateImage(bitmap, streamId);
+                                                image.Dispose();
+                                            }
+                                            else
+                                            {
+                                                UpdateImage(image, streamId);
+                                            }
+                                            
+                                            if (streamId == 1)
+                                            {
+                                                frameCount1++;
+                                                var now = DateTime.Now;
+                                                var elapsed = (now - lastFrameTime1).TotalSeconds;
+                                                if (elapsed > 0)
+                                                {
+                                                    double fps = 1.0 / elapsed;
+                                                    UpdateFrameInfo(frameCount1, fps, 1);
+                                                }
+                                                lastFrameTime1 = now;
+                                            }
+                                            else
+                                            {
+                                                frameCount2++;
+                                                var now = DateTime.Now;
+                                                var elapsed = (now - lastFrameTime2).TotalSeconds;
+                                                if (elapsed > 0)
+                                                {
+                                                    double fps = 1.0 / elapsed;
+                                                    UpdateFrameInfo(frameCount2, fps, 2);
+                                                }
+                                                lastFrameTime2 = now;
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Error decoding: {ex.Message}");
+                                        }
+                                    }
+                                    
+                                    frameBuffer.Clear();
+                                }
+                                
+                                if (frameBuffer.Count > 500000)
+                                {
+                                    frameBuffer.Clear();
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Read error: {ex.Message}");
+                            frameBuffer.Clear();
+                        }
+                    }
+                }
+                catch (TaskCanceledException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Stopped");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Error: {ex}");
+                }
+            }, cancellationToken!.Token);
+        }
+
+        private void UpdateImage(Image image, int streamId)
+        {
+            var pictureBox = streamId == 1 ? pictureBox1 : pictureBox2;
+            
             if (pictureBox.InvokeRequired)
             {
-                pictureBox.Invoke(new Action<Image>(UpdateImage), image);
+                pictureBox.Invoke(new Action<Image, int>(UpdateImage), image, streamId);
                 return;
             }
 
@@ -325,15 +449,18 @@ namespace TelescopeWatcher
             lblStatus.BackColor = color;
         }
 
-        private void UpdateFrameInfo(int frames, double fps)
+        private void UpdateFrameInfo(int frames, double fps, int streamId)
         {
-            if (lblFrameInfo.InvokeRequired)
+            var label = streamId == 1 ? lblFrameInfo1 : lblFrameInfo2;
+            string cameraName = streamId == 1 ? "Main" : "Secondary";
+            
+            if (label.InvokeRequired)
             {
-                lblFrameInfo.Invoke(new Action<int, double>(UpdateFrameInfo), frames, fps);
+                label.Invoke(new Action<int, double, int>(UpdateFrameInfo), frames, fps, streamId);
                 return;
             }
 
-            lblFrameInfo.Text = $"Frame: {frames} | FPS: {fps:F1}";
+            label.Text = $"{cameraName}: Frame {frames} | FPS: {fps:F1}";
         }
 
         private void BtnClose_Click(object? sender, EventArgs e)
@@ -353,13 +480,16 @@ namespace TelescopeWatcher
 
             try
             {
-                streamTask?.Wait(TimeSpan.FromSeconds(2));
+                streamTask1?.Wait(TimeSpan.FromSeconds(2));
+                streamTask2?.Wait(TimeSpan.FromSeconds(2));
             }
             catch { }
 
             cancellationToken?.Dispose();
-            httpClient?.Dispose();
-            pictureBox?.Image?.Dispose();
+            httpClient1?.Dispose();
+            httpClient2?.Dispose();
+            pictureBox1?.Image?.Dispose();
+            pictureBox2?.Image?.Dispose();
         }
 
         private void ChkFlipHorizontal_CheckedChanged(object? sender, EventArgs e)

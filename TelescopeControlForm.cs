@@ -161,13 +161,25 @@ namespace TelescopeWatcher
             try
             {
                 btnVideoStart.Enabled = false;
-                AddLogMessage("Starting video stream...");
+                AddLogMessage("Starting video streams...");
                 
-                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/start");
+                // Extract base URL for secondary server
+                var uri = new Uri(videoServerUrl);
+                string secondaryServerUrl = $"{uri.Scheme}://{uri.Host}:5001";
                 
-                if (response.IsSuccessStatusCode)
+                // Start both video servers
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/start");
+                var response2Task = videoHttpClient.GetAsync($"{secondaryServerUrl}/start");
+                
+                var response1 = await response1Task;
+                var response2 = await response2Task;
+                
+                bool mainSuccess = response1.IsSuccessStatusCode;
+                bool secondarySuccess = response2.IsSuccessStatusCode;
+                
+                if (mainSuccess && secondarySuccess)
                 {
-                    AddLogMessage("Video stream started successfully");
+                    AddLogMessage("Both video streams started successfully");
                     UpdateVideoStatus(true, "Streaming");
                     
                     // Open video player window
@@ -175,8 +187,6 @@ namespace TelescopeWatcher
                     {
                         try
                         {
-                            // Extract base URL without port for video player
-                            var uri = new Uri(videoServerUrl);
                             string baseUrl = $"{uri.Scheme}://{uri.Host}";
                             
                             videoPlayerForm = new VideoPlayerForm(baseUrl);
@@ -187,7 +197,7 @@ namespace TelescopeWatcher
                                 AddLogMessage("Video player window closed");
                             };
                             
-                            AddLogMessage($"Video player opened - streaming from {baseUrl}:8080");
+                            AddLogMessage($"Video player opened - Main: {baseUrl}:8080, Secondary: {baseUrl}:8081");
                         }
                         catch (Exception ex)
                         {
@@ -204,10 +214,57 @@ namespace TelescopeWatcher
                 }
                 else
                 {
-                    string error = await response.Content.ReadAsStringAsync();
-                    AddLogMessage($"Failed to start video stream: {error}");
-                    MessageBox.Show($"Failed to start video stream.\n\nServer response: {error}", 
-                        "Stream Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    string error = "";
+                    if (!mainSuccess)
+                    {
+                        string mainError = await response1.Content.ReadAsStringAsync();
+                        error += $"Main stream (port 5000): {mainError}\n";
+                        AddLogMessage($"Failed to start main video stream: {mainError}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Main video stream started successfully");
+                    }
+                    
+                    if (!secondarySuccess)
+                    {
+                        string secondaryError = await response2.Content.ReadAsStringAsync();
+                        error += $"Secondary stream (port 5001): {secondaryError}";
+                        AddLogMessage($"Failed to start secondary video stream: {secondaryError}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Secondary video stream started successfully");
+                    }
+                    
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        MessageBox.Show($"Failed to start one or more video streams:\n\n{error}", 
+                            "Stream Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    
+                    // Open player even if only one stream started
+                    if (mainSuccess || secondarySuccess)
+                    {
+                        if (videoPlayerForm == null || videoPlayerForm.IsDisposed)
+                        {
+                            try
+                            {
+                                string baseUrl = $"{uri.Scheme}://{uri.Host}";
+                                videoPlayerForm = new VideoPlayerForm(baseUrl);
+                                videoPlayerForm.Show();
+                                videoPlayerForm.FormClosed += (s, args) =>
+                                {
+                                    videoPlayerForm = null;
+                                    AddLogMessage("Video player window closed");
+                                };
+                            }
+                            catch (Exception ex)
+                            {
+                                AddLogMessage($"Error opening video player: {ex.Message}");
+                            }
+                        }
+                    }
                 }
             }
             catch (TaskCanceledException)
@@ -219,8 +276,8 @@ namespace TelescopeWatcher
             }
             catch (Exception ex)
             {
-                AddLogMessage($"Error starting video stream: {ex.Message}");
-                MessageBox.Show($"Error starting video stream:\n\n{ex.Message}", 
+                AddLogMessage($"Error starting video streams: {ex.Message}");
+                MessageBox.Show($"Error starting video streams:\n\n{ex.Message}", 
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -240,7 +297,7 @@ namespace TelescopeWatcher
             try
             {
                 btnVideoStop.Enabled = false;
-                AddLogMessage("Stopping video stream...");
+                AddLogMessage("Stopping video streams...");
                 
                 // Close video player window if open
                 if (videoPlayerForm != null && !videoPlayerForm.IsDisposed)
@@ -250,17 +307,46 @@ namespace TelescopeWatcher
                     AddLogMessage("Video player window closed");
                 }
                 
-                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/stop");
+                // Extract base URL for secondary server
+                var uri = new Uri(videoServerUrl);
+                string secondaryServerUrl = $"{uri.Scheme}://{uri.Host}:5001";
                 
-                if (response.IsSuccessStatusCode)
+                // Stop both video servers
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/stop");
+                var response2Task = videoHttpClient.GetAsync($"{secondaryServerUrl}/stop");
+                
+                var response1 = await response1Task;
+                var response2 = await response2Task;
+                
+                bool mainSuccess = response1.IsSuccessStatusCode;
+                bool secondarySuccess = response2.IsSuccessStatusCode;
+                
+                if (mainSuccess && secondarySuccess)
                 {
-                    AddLogMessage("Video stream stopped successfully");
+                    AddLogMessage("Both video streams stopped successfully");
                     UpdateVideoStatus(true, "Online");
                 }
                 else
                 {
-                    string error = await response.Content.ReadAsStringAsync();
-                    AddLogMessage($"Failed to stop video stream: {error}");
+                    if (!mainSuccess)
+                    {
+                        string error = await response1.Content.ReadAsStringAsync();
+                        AddLogMessage($"Failed to stop main video stream: {error}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Main video stream stopped successfully");
+                    }
+                    
+                    if (!secondarySuccess)
+                    {
+                        string error = await response2.Content.ReadAsStringAsync();
+                        AddLogMessage($"Failed to stop secondary video stream: {error}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Secondary video stream stopped successfully");
+                    }
                 }
             }
             catch (TaskCanceledException)
@@ -270,7 +356,7 @@ namespace TelescopeWatcher
             }
             catch (Exception ex)
             {
-                AddLogMessage($"Error stopping video stream: {ex.Message}");
+                AddLogMessage($"Error stopping video streams: {ex.Message}");
             }
             finally
             {
