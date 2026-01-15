@@ -7,8 +7,8 @@ namespace TelescopeWatcher
         private SerialPort? serialPort;
         private string? selectedPort;
         private TelescopeControlForm? telescopeControlForm;
-        private bool isServerMode = false;
-        private string serverUrl = "http://192.168.0.211:5002";
+        private bool isServerMode = true; // Default to server mode
+        private string serverUrl = "http://192.168.4.1:5002";
 
         public MainForm()
         {
@@ -19,7 +19,7 @@ namespace TelescopeWatcher
         {
             RefreshPortList();
             UpdateUIForConnectionMode();
-            AddStatusMessage("Application started. Please select connection mode and click Connect.");
+            AddStatusMessage("Application started. Default mode: HTTP Server (192.168.4.1:5002)");
         }
 
         private void radioSerial_CheckedChanged(object sender, EventArgs e)
@@ -37,7 +37,6 @@ namespace TelescopeWatcher
             if (radioServer.Checked)
             {
                 isServerMode = true;
-                serverUrl = txtServerUrl.Text;
                 UpdateUIForConnectionMode();
                 AddStatusMessage("Connection mode: HTTP Server");
             }
@@ -47,15 +46,13 @@ namespace TelescopeWatcher
         {
             if (isServerMode)
             {
-                // Server mode
                 txtServerUrl.Enabled = true;
                 listBoxPorts.Enabled = false;
                 btnRefresh.Enabled = false;
-                lblPorts.Text = "Server Mode:";
+                lblPorts.Text = "Server Mode - Port 5002";
             }
             else
             {
-                // Serial mode
                 txtServerUrl.Enabled = false;
                 listBoxPorts.Enabled = true;
                 btnRefresh.Enabled = true;
@@ -97,18 +94,29 @@ namespace TelescopeWatcher
         {
             try
             {
-                serverUrl = txtServerUrl.Text.Trim();
+                string serverIp = txtServerUrl.Text.Trim();
                 
-                if (string.IsNullOrEmpty(serverUrl))
+                if (string.IsNullOrEmpty(serverIp))
                 {
-                    MessageBox.Show("Please enter a server URL.", "No Server URL", 
+                    MessageBox.Show("Please enter a server IP address.", "No Server IP", 
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
+                // Construct full URL with fixed port 5002 and add http:// if missing
+                if (!serverIp.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
+                    !serverIp.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    serverUrl = $"http://{serverIp}:5002";
+                }
+                else
+                {
+                    // If user included http://, just add port
+                    serverUrl = serverIp.Contains(":") ? serverIp : $"{serverIp}:5002";
+                }
+                
                 AddStatusMessage($"Connecting to server: {serverUrl}");
                 
-                // Test server connection
                 using (var client = new System.Net.Http.HttpClient())
                 {
                     client.Timeout = TimeSpan.FromSeconds(5);
@@ -118,14 +126,12 @@ namespace TelescopeWatcher
                     {
                         AddStatusMessage($"Successfully connected to server: {serverUrl}");
                         
-                        // Update UI
                         btnConnect.Enabled = false;
                         btnDisconnect.Enabled = true;
                         radioSerial.Enabled = false;
                         radioServer.Enabled = false;
                         txtServerUrl.Enabled = false;
                         
-                        // Open telescope control window
                         OpenTelescopeControlForServer();
                     }
                     else
@@ -137,7 +143,7 @@ namespace TelescopeWatcher
             catch (Exception ex)
             {
                 AddStatusMessage($"Error connecting to server: {ex.Message}");
-                MessageBox.Show($"Failed to connect to server.\r\n\r\nError: {ex.Message}", 
+                MessageBox.Show($"Failed to connect to server.\r\n\r\nError: {ex.Message}\r\n\r\nMake sure the server is running on {serverUrl}", 
                     "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -188,7 +194,6 @@ namespace TelescopeWatcher
                 AddStatusMessage($"Successfully connected to {portName}");
                 AddStatusMessage($"Settings: {serialPort.BaudRate} baud, {serialPort.DataBits} data bits, {serialPort.Parity} parity, {serialPort.StopBits} stop bits");
 
-                // Update UI
                 btnConnect.Enabled = false;
                 btnDisconnect.Enabled = true;
                 btnRefresh.Enabled = false;
@@ -196,7 +201,6 @@ namespace TelescopeWatcher
                 radioSerial.Enabled = false;
                 radioServer.Enabled = false;
 
-                // Open telescope control window
                 OpenTelescopeControl();
             }
             catch (Exception ex)
@@ -226,7 +230,6 @@ namespace TelescopeWatcher
 
         private void DisconnectFromPort()
         {
-            // Close telescope control window if open
             if (telescopeControlForm != null && !telescopeControlForm.IsDisposed)
             {
                 telescopeControlForm.Close();
@@ -256,7 +259,6 @@ namespace TelescopeWatcher
                 AddStatusMessage($"Disconnected from server: {serverUrl}");
             }
 
-            // Update UI
             btnConnect.Enabled = true;
             btnDisconnect.Enabled = false;
             radioSerial.Enabled = true;
@@ -271,7 +273,6 @@ namespace TelescopeWatcher
                 if (serialPort != null && serialPort.IsOpen)
                 {
                     string data = serialPort.ReadExisting();
-                    // Use Invoke to safely update UI from another thread
                     this.Invoke(new Action(() =>
                     {
                         AddStatusMessage($"Received: {data}");

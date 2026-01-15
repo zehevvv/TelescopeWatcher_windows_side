@@ -20,7 +20,8 @@ namespace TelescopeWatcher
         private int focusSpeed = 9;
         private bool isServerMode = false;
         private string? videoServerUrl;
-        private HttpClient videoHttpClient;
+        private HttpClient? videoHttpClient;
+        private VideoPlayerForm? videoPlayerForm;
         
         private readonly int[] stepsPerSecondValues = { 3, 1, 10, 100, 1000, 10000 };
 
@@ -35,10 +36,16 @@ namespace TelescopeWatcher
             {
                 this.serverClient = new SerialServerClient(serverUrl);
                 this.isServerMode = true;
+                
+                // Extract video server URL (port 5000)
                 try
                 {
                     var uri = new Uri(serverUrl);
                     this.videoServerUrl = $"{uri.Scheme}://{uri.Host}:5000";
+                    
+                    // Initialize video HTTP client with short timeout
+                    this.videoHttpClient = new HttpClient();
+                    this.videoHttpClient.Timeout = TimeSpan.FromSeconds(2);
                 }
                 catch { this.videoServerUrl = null; }
             }
@@ -62,16 +69,24 @@ namespace TelescopeWatcher
             
             if (isServerMode)
             {
-                serverClient?.StartStreaming(OnServerDataReceived);
-                AddLogMessage("Server streaming started");
+                AddLogMessage("Connected to server");
+                
+                // Start video status polling
                 videoStatusTimer = new System.Windows.Forms.Timer();
-                videoStatusTimer.Interval = 3000;
+                videoStatusTimer.Interval = 3000; // 3 seconds
                 videoStatusTimer.Tick += VideoStatusTimer_Tick;
                 videoStatusTimer.Start();
-                CheckVideoServerStatus();
+                
+                // Initial status check
+                _ = CheckVideoServerStatusAsync();
+            }
+            else
+            {
+                grpVideoStream.Visible = false;
             }
             else { grpVideoStream.Visible = false; }
             
+            // Wire up button events
             btnUp.MouseDown += BtnUp_MouseDown;
             btnUp.MouseUp += BtnUp_MouseUp;
             btnDown.MouseDown += BtnDown_MouseDown;
@@ -91,7 +106,343 @@ namespace TelescopeWatcher
             UpdateFocusSpeedDisplay();
         }
 
-        private void VideoStatusTimer_Tick(object? sender, EventArgs e) => CheckVideoServerStatus();
+        #region Video Stream Control
+
+        private void VideoStatusTimer_Tick(object? sender, EventArgs e)
+        {
+            _ = CheckVideoServerStatusAsync();
+        }
+
+        private async Task CheckVideoServerStatusAsync()
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                UpdateVideoStatus(false, "No URL");
+                return;
+            }
+
+            try
+            {
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/ping");
+                UpdateVideoStatus(response.IsSuccessStatusCode, response.IsSuccessStatusCode ? "Online" : "Offline");
+            }
+            catch
+            {
+                UpdateVideoStatus(false, "Offline");
+            }
+        }
+
+        private void UpdateVideoStatus(bool isOnline, string status)
+        {
+            if (lblVideoStatus.InvokeRequired)
+            {
+                lblVideoStatus.Invoke(new Action(() => UpdateVideoStatus(isOnline, status)));
+                return;
+            }
+            
+            lblVideoStatus.Text = status;
+            lblVideoStatus.ForeColor = isOnline ? System.Drawing.Color.Green : System.Drawing.Color.Red;
+        }
+
+        private async void btnVideoStart_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                AddLogMessage("Error: Video server URL not available");
+                return;
+            }
+
+            try
+            {
+                btnVideoStart.Enabled = false;
+                AddLogMessage("Starting video streams...");
+                
+                // Extract base URL for secondary server
+                var uri = new Uri(videoServerUrl);
+                string secondaryServerUrl = $"{uri.Scheme}://{uri.Host}:5001";
+                
+                // Start both video servers
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/start");
+                var response2Task = videoHttpClient.GetAsync($"{secondaryServerUrl}/start");
+                
+                var response1 = await response1Task;
+                var response2 = await response2Task;
+                
+                bool mainSuccess = response1.IsSuccessStatusCode;
+                bool secondarySuccess = response2.IsSuccessStatusCode;
+                
+                if (mainSuccess && secondarySuccess)
+                {
+                    AddLogMessage("Both video streams started successfully");
+                    UpdateVideoStatus(true, "Streaming");
+                    
+                    // Open video player window
+                    if (videoPlayerForm == null || videoPlayerForm.IsDisposed)
+                    {
+                        try
+                        {
+                            string baseUrl = $"{uri.Scheme}://{uri.Host}";
+                            
+                            videoPlayerForm = new VideoPlayerForm(baseUrl);
+                            videoPlayerForm.Show();
+                            videoPlayerForm.FormClosed += (s, args) =>
+                            {
+                                videoPlayerForm = null;
+                                AddLogMessage("Video player window closed");
+                            };
+                            
+                            AddLogMessage($"Video player opened - Main: {baseUrl}:8080, Secondary: {baseUrl}:8081");
+                        }
+                        catch (Exception ex)
+                        {
+                            AddLogMessage($"Error opening video player: {ex.Message}");
+                            MessageBox.Show($"Failed to open video player:\n\n{ex.Message}", 
+                                "Video Player Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    else
+                    {
+                        videoPlayerForm.BringToFront();
+                        AddLogMessage("Video player already open");
+                    }
+                }
+                else
+                {
+                    string error = "";
+                    if (!mainSuccess)
+                    {
+                        string mainError = await response1.Content.ReadAsStringAsync();
+                        error += $"Main stream (port 5000): {mainError}\n";
+                        AddLogMessage($"Failed to start main video stream: {mainError}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Main video stream started successfully");
+                    }
+                    
+                    if (!secondarySuccess)
+                    {
+                        string secondaryError = await response2.Content.ReadAsStringAsync();
+                        error += $"Secondary stream (port 5001): {secondaryError}";
+                        AddLogMessage($"Failed to start secondary video stream: {secondaryError}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Secondary video stream started successfully");
+                    }
+                    
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        MessageBox.Show($"Failed to start one or more video streams:\n\n{error}", 
+                            "Stream Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    
+                    // Open player even if only one stream started
+                    if (mainSuccess || secondarySuccess)
+                    {
+                        if (videoPlayerForm == null || videoPlayerForm.IsDisposed)
+                        {
+                            try
+                            {
+                                string baseUrl = $"{uri.Scheme}://{uri.Host}";
+                                videoPlayerForm = new VideoPlayerForm(baseUrl);
+                                videoPlayerForm.Show();
+                                videoPlayerForm.FormClosed += (s, args) =>
+                                {
+                                    videoPlayerForm = null;
+                                    AddLogMessage("Video player window closed");
+                                };
+                            }
+                            catch (Exception ex)
+                            {
+                                AddLogMessage($"Error opening video player: {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                AddLogMessage("Video start request timed out");
+                UpdateVideoStatus(false, "Timeout");
+                MessageBox.Show("Video start request timed out.\n\nThe server may be busy or unreachable.", 
+                    "Timeout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error starting video streams: {ex.Message}");
+                MessageBox.Show($"Error starting video streams:\n\n{ex.Message}", 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnVideoStart.Enabled = true;
+            }
+        }
+
+        private async void btnVideoStop_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                AddLogMessage("Error: Video server URL not available");
+                return;
+            }
+
+            try
+            {
+                btnVideoStop.Enabled = false;
+                AddLogMessage("Stopping video streams...");
+                
+                // Close video player window if open
+                if (videoPlayerForm != null && !videoPlayerForm.IsDisposed)
+                {
+                    videoPlayerForm.Close();
+                    videoPlayerForm = null;
+                    AddLogMessage("Video player window closed");
+                }
+                
+                // Extract base URL for secondary server
+                var uri = new Uri(videoServerUrl);
+                string secondaryServerUrl = $"{uri.Scheme}://{uri.Host}:5001";
+                
+                // Stop both video servers
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/stop");
+                var response2Task = videoHttpClient.GetAsync($"{secondaryServerUrl}/stop");
+                
+                var response1 = await response1Task;
+                var response2 = await response2Task;
+                
+                bool mainSuccess = response1.IsSuccessStatusCode;
+                bool secondarySuccess = response2.IsSuccessStatusCode;
+                
+                if (mainSuccess && secondarySuccess)
+                {
+                    AddLogMessage("Both video streams stopped successfully");
+                    UpdateVideoStatus(true, "Online");
+                }
+                else
+                {
+                    if (!mainSuccess)
+                    {
+                        string error = await response1.Content.ReadAsStringAsync();
+                        AddLogMessage($"Failed to stop main video stream: {error}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Main video stream stopped successfully");
+                    }
+                    
+                    if (!secondarySuccess)
+                    {
+                        string error = await response2.Content.ReadAsStringAsync();
+                        AddLogMessage($"Failed to stop secondary video stream: {error}");
+                    }
+                    else
+                    {
+                        AddLogMessage("Secondary video stream stopped successfully");
+                    }
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                AddLogMessage("Video stop request timed out");
+                UpdateVideoStatus(false, "Timeout");
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error stopping video streams: {ex.Message}");
+            }
+            finally
+            {
+                btnVideoStop.Enabled = true;
+            }
+        }
+
+        #endregion
+
+        #region Server Data Streaming
+
+        private void OnServerDataReceived(string data)
+        {
+            if (string.IsNullOrWhiteSpace(data)) return;
+            
+            try
+            {
+                string trimmed = data.Trim();
+                if (txtLog.InvokeRequired)
+                {
+                    txtLog.Invoke(new Action(() => AddLogMessage($"Server: {trimmed}")));
+                }
+                else
+                {
+                    AddLogMessage($"Server: {trimmed}");
+                }
+            }
+            catch { }
+        }
+
+        #endregion
+
+        private void trackBarStepsPerSecond_Scroll(object? sender, EventArgs e)
+        {
+            UpdateStepsPerSecondDisplay();
+        }
+
+        private void trackBarFocusSpeed_Scroll(object? sender, EventArgs e)
+        {
+            UpdateFocusSpeedDisplay();
+        }
+
+        private void UpdateFocusSpeedDisplay()
+        {
+            focusSpeed = trackBarFocusSpeed.Value;
+            lblFocusSpeedValue.Text = $"Speed: {focusSpeed}";
+            AddLogMessage($"Focus motor speed set to {focusSpeed}");
+        }
+
+        private void UpdateStepsPerSecondDisplay()
+        {
+            int trackBarValue = trackBarStepsPerSecond.Value;
+            int stepsPerSecond = stepsPerSecondValues[trackBarValue];
+            
+            // Calculate time between steps in milliseconds
+            double timeMs = 1000.0 / stepsPerSecond;
+            timeBetweenSteps = (int)Math.Round(timeMs);
+            
+            // Ensure minimum time is at least 0.1ms for very high speeds
+            if (stepsPerSecond == 10000)
+            {
+                timeBetweenSteps = 0; // Will send as t=0.1 in the command
+            }
+            
+            // Update display labels
+            lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/second";
+            
+            if (stepsPerSecond == 10000)
+            {
+                lblTimeValue.Text = "(t=0.1 ms)";
+            }
+            else
+            {
+                lblTimeValue.Text = $"(t={timeMs:F1} ms)";
+            }
+            
+            AddLogMessage($"Speed set to {stepsPerSecond} steps/second (t={(stepsPerSecond == 10000 ? "0.1" : timeMs.ToString("F1"))} ms)");
+        }
+
+        private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)
+        {
+            // Prevent auto-repeat of KeyDown events
+            if (isKeyPressed || isFocusKeyPressed)
+            {
+                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
+                    e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true; // Prevent default arrow key behavior
+                }
+                return;
+            }
 
         private async void CheckVideoServerStatus()
         {
@@ -113,18 +464,96 @@ namespace TelescopeWatcher
 
         private async void btnVideoStart_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(videoServerUrl)) { AddLogMessage("Error: Video server URL not available"); return; }
-            try
-            {
-                AddLogMessage("Starting video stream...");
-                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/start");
-                if (response.IsSuccessStatusCode) { AddLogMessage("Video stream started successfully"); UpdateVideoStatus(true, "Streaming"); }
-                else { AddLogMessage($"Failed to start video stream: {await response.Content.ReadAsStringAsync()}"); }
-            }
-            catch (Exception ex) { AddLogMessage($"Error starting video stream: {ex.Message}"); }
+            commandTimer.Stop();
+            SendStopCommand();
+            currentDirection = "";
+            AddLogMessage("UP button released - stopped sending commands");
         }
 
-        private async void btnVideoStop_Click(object sender, EventArgs e)
+        private void BtnDown_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentDirection = "DOWN";
+            SendTelescopeCommand("DOWN");
+            commandTimer.Start();
+        }
+
+        private void BtnDown_MouseUp(object? sender, MouseEventArgs e)
+        {
+            commandTimer.Stop();
+            SendStopCommand();
+            currentDirection = "";
+            AddLogMessage("DOWN button released - stopped sending commands");
+        }
+
+        private void BtnLeft_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentDirection = "LEFT";
+            SendTelescopeCommand("LEFT");
+            commandTimer.Start();
+        }
+
+        private void BtnLeft_MouseUp(object? sender, MouseEventArgs e)
+        {
+            commandTimer.Stop();
+            SendStopCommand();
+            currentDirection = "";
+            AddLogMessage("LEFT button released - stopped sending commands");
+        }
+
+        private void BtnRight_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentDirection = "RIGHT";
+            SendTelescopeCommand("RIGHT");
+            commandTimer.Start();
+        }
+
+        private void BtnRight_MouseUp(object? sender, MouseEventArgs e)
+        {
+            commandTimer.Stop();
+            SendStopCommand();
+            currentDirection = "";
+            AddLogMessage("RIGHT button released - stopped sending commands");
+        }
+
+        private void BtnFocusIncrease_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentFocusDirection = "INCREASE";
+            SendFocusCommand("INCREASE");
+            focusTimer.Start();
+        }
+
+        private void BtnFocusIncrease_MouseUp(object? sender, MouseEventArgs e)
+        {
+            focusTimer.Stop();
+            SendFocusStopCommand();
+            currentFocusDirection = "";
+            AddLogMessage("Focus INCREASE button released");
+        }
+
+        private void BtnFocusDecrease_MouseDown(object? sender, MouseEventArgs e)
+        {
+            currentFocusDirection = "DECREASE";
+            SendFocusCommand("DECREASE");
+            focusTimer.Start();
+        }
+
+        private void BtnFocusDecrease_MouseUp(object? sender, MouseEventArgs e)
+        {
+            focusTimer.Stop();
+            SendFocusStopCommand();
+            currentFocusDirection = "";
+            AddLogMessage("Focus DECREASE button released");
+        }
+
+        private void FocusTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(currentFocusDirection))
+            {
+                SendFocusStepsCommand();
+            }
+        }
+
+        private void CommandTimer_Tick(object? sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(videoServerUrl)) { AddLogMessage("Error: Video server URL not available"); return; }
             try
@@ -271,11 +700,23 @@ namespace TelescopeWatcher
 
         private void TelescopeControlForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            commandTimer?.Stop(); commandTimer?.Dispose();
-            focusTimer?.Stop(); focusTimer?.Dispose();
-            videoStatusTimer?.Stop(); videoStatusTimer?.Dispose();
+            commandTimer?.Stop();
+            commandTimer?.Dispose();
+            focusTimer?.Stop();
+            focusTimer?.Dispose();
+            
+            videoStatusTimer?.Stop();
+            videoStatusTimer?.Dispose();
             videoHttpClient?.Dispose();
-            if (isServerMode && serverClient != null) { serverClient.StopStreaming(); serverClient.Dispose(); }
+            
+            // Close video player window if open
+            if (videoPlayerForm != null && !videoPlayerForm.IsDisposed)
+            {
+                videoPlayerForm.Close();
+                videoPlayerForm = null;
+            }
+            
+            serverClient?.Dispose();
         }
     }
 }

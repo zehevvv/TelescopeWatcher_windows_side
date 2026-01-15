@@ -126,29 +126,31 @@ namespace TelescopeWatcher
             // 
             // txtServerUrl
             // 
-            this.txtServerUrl.Enabled = false;
+            this.txtServerUrl.Enabled = true;
             this.txtServerUrl.Location = new System.Drawing.Point(90, 75);
             this.txtServerUrl.Name = "txtServerUrl";
             this.txtServerUrl.Size = new System.Drawing.Size(212, 23);
             this.txtServerUrl.TabIndex = 3;
-            this.txtServerUrl.Text = "http://192.168.1.100:5002";
+            this.txtServerUrl.Text = "192.168.4.1";
             // 
             // lblServerUrl
             // 
             this.lblServerUrl.AutoSize = true;
             this.lblServerUrl.Location = new System.Drawing.Point(15, 78);
             this.lblServerUrl.Name = "lblServerUrl";
-            this.lblServerUrl.Size = new System.Drawing.Size(69, 15);
+            this.lblServerUrl.Size = new System.Drawing.Size(52, 15);
             this.lblServerUrl.TabIndex = 2;
-            this.lblServerUrl.Text = "Server URL:";
+            this.lblServerUrl.Text = "Server IP:";
             // 
             // radioServer
             // 
             this.radioServer.AutoSize = true;
+            this.radioServer.Checked = true;
             this.radioServer.Location = new System.Drawing.Point(15, 50);
             this.radioServer.Name = "radioServer";
             this.radioServer.Size = new System.Drawing.Size(151, 19);
             this.radioServer.TabIndex = 1;
+            this.radioServer.TabStop = true;
             this.radioServer.Text = "Connect via HTTP Server";
             this.radioServer.UseVisualStyleBackColor = true;
             this.radioServer.CheckedChanged += new System.EventHandler(this.radioServer_CheckedChanged);
@@ -156,12 +158,10 @@ namespace TelescopeWatcher
             // radioSerial
             // 
             this.radioSerial.AutoSize = true;
-            this.radioSerial.Checked = true;
             this.radioSerial.Location = new System.Drawing.Point(15, 25);
             this.radioSerial.Name = "radioSerial";
             this.radioSerial.Size = new System.Drawing.Size(139, 19);
             this.radioSerial.TabIndex = 0;
-            this.radioSerial.TabStop = true;
             this.radioSerial.Text = "Connect via USB Serial";
             this.radioSerial.UseVisualStyleBackColor = true;
             this.radioSerial.CheckedChanged += new System.EventHandler(this.radioSerial_CheckedChanged);

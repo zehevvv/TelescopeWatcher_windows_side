@@ -65,7 +65,7 @@ namespace TelescopeWatcher
             this.btnUp.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
             this.btnUp.FlatAppearance.BorderSize = 2;
             this.btnUp.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.btnUp.Location = new System.Drawing.Point(450, 60);
+            this.btnUp.Location = new System.Drawing.Point(450, 75);
             this.btnUp.Name = "btnUp";
             this.btnUp.Size = new System.Drawing.Size(60, 50);
             this.btnUp.TabIndex = 0;
@@ -80,7 +80,7 @@ namespace TelescopeWatcher
             this.btnDown.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
             this.btnDown.FlatAppearance.BorderSize = 2;
             this.btnDown.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.btnDown.Location = new System.Drawing.Point(450, 115);
+            this.btnDown.Location = new System.Drawing.Point(450, 130);
             this.btnDown.Name = "btnDown";
             this.btnDown.Size = new System.Drawing.Size(60, 50);
             this.btnDown.TabIndex = 1;
@@ -95,7 +95,7 @@ namespace TelescopeWatcher
             this.btnLeft.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
             this.btnLeft.FlatAppearance.BorderSize = 2;
             this.btnLeft.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.btnLeft.Location = new System.Drawing.Point(385, 115);
+            this.btnLeft.Location = new System.Drawing.Point(385, 130);
             this.btnLeft.Name = "btnLeft";
             this.btnLeft.Size = new System.Drawing.Size(60, 50);
             this.btnLeft.TabIndex = 7;
@@ -110,7 +110,7 @@ namespace TelescopeWatcher
             this.btnRight.FlatAppearance.BorderColor = System.Drawing.Color.Gray;
             this.btnRight.FlatAppearance.BorderSize = 2;
             this.btnRight.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnRight.Location = new System.Drawing.Point(515, 115);
+            this.btnRight.Location = new System.Drawing.Point(515, 130);
             this.btnRight.Name = "btnRight";
             this.btnRight.Size = new System.Drawing.Size(60, 50);
             this.btnRight.TabIndex = 8;
@@ -149,11 +149,11 @@ namespace TelescopeWatcher
             // 
             // lblPortInfo
             // 
-            this.lblPortInfo.AutoSize = true;
+            this.lblPortInfo.AutoSize = false;
             this.lblPortInfo.ForeColor = System.Drawing.Color.Green;
-            this.lblPortInfo.Location = new System.Drawing.Point(400, 20);
+            this.lblPortInfo.Location = new System.Drawing.Point(12, 45);
             this.lblPortInfo.Name = "lblPortInfo";
-            this.lblPortInfo.Size = new System.Drawing.Size(100, 15);
+            this.lblPortInfo.Size = new System.Drawing.Size(580, 15);
             this.lblPortInfo.TabIndex = 5;
             this.lblPortInfo.Text = "Connected: COM1";
             // 
@@ -163,9 +163,9 @@ namespace TelescopeWatcher
             this.grpTimeBetweenSteps.Controls.Add(this.lblTimeValue);
             this.grpTimeBetweenSteps.Controls.Add(this.trackBarStepsPerSecond);
             this.grpTimeBetweenSteps.Controls.Add(this.lblStepsPerSecond);
-            this.grpTimeBetweenSteps.Location = new System.Drawing.Point(12, 55);
+            this.grpTimeBetweenSteps.Location = new System.Drawing.Point(12, 70);
             this.grpTimeBetweenSteps.Name = "grpTimeBetweenSteps";
-            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(360, 145);
+            this.grpTimeBetweenSteps.Size = new System.Drawing.Size(360, 130);
             this.grpTimeBetweenSteps.TabIndex = 6;
             this.grpTimeBetweenSteps.TabStop = false;
             this.grpTimeBetweenSteps.Text = "Speed Control";
