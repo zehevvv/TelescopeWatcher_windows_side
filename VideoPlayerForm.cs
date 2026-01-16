@@ -42,6 +42,8 @@ namespace TelescopeWatcher
         // Circle overlay fields
         private bool isAddingCircle = false;
         private Point? whiteCirclePosition = null;
+        private PointF? whiteCirclePositionRelative = null;  // Store as percentage (0.0 to 1.0)
+        private int whiteCircleRadius = 30;
         private int circleRadius = 30;
         private const int MIN_RADIUS = 10;
         private const int MAX_RADIUS = 200;
@@ -165,7 +167,7 @@ namespace TelescopeWatcher
 
             btnCircleSizeDecrease = new Button
             {
-                Text = "?",
+                Text = "-",
                 Width = 30,
                 Height = 25,
                 ForeColor = System.Drawing.Color.White,
@@ -282,6 +284,14 @@ namespace TelescopeWatcher
             this.Controls.Add(btnClose);
 
             this.Load += VideoPlayerForm_Load;
+            this.Resize += VideoPlayerForm_Resize;
+        }
+
+        private void VideoPlayerForm_Resize(object? sender, EventArgs e)
+        {
+            // Recalculate circle position when window is resized
+            UpdateWhiteCircleAbsolutePosition();
+            pictureBox2.Invalidate();
         }
 
         private void RadioStream_CheckedChanged(object? sender, EventArgs e)
@@ -291,14 +301,14 @@ namespace TelescopeWatcher
                 pictureBox1.Visible = true;
                 pictureBox1.Dock = DockStyle.Fill;
                 pictureBox2.Visible = false;
-                pictureBox2.Dock = DockStyle.None;  // Reset dock
+                pictureBox2.Dock = DockStyle.None;
                 lblFrameInfo1.Visible = true;
                 lblFrameInfo2.Visible = false;
             }
             else if (radioSecondaryOnly.Checked)
             {
                 pictureBox1.Visible = false;
-                pictureBox1.Dock = DockStyle.None;  // Reset dock
+                pictureBox1.Dock = DockStyle.None;
                 pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Fill;
                 lblFrameInfo1.Visible = false;
@@ -314,6 +324,10 @@ namespace TelescopeWatcher
                 lblFrameInfo1.Visible = true;
                 lblFrameInfo2.Visible = true;
             }
+            
+            // Recalculate absolute position from relative when layout changes
+            UpdateWhiteCircleAbsolutePosition();
+            pictureBox2.Invalidate();
         }
 
         private async void VideoPlayerForm_Load(object? sender, EventArgs e)
@@ -662,24 +676,44 @@ namespace TelescopeWatcher
         {
             if (isAddingCircle && e.Button == MouseButtons.Left)
             {
-                // Set white circle at click position
-                whiteCirclePosition = e.Location;
-                SaveWhiteCirclePosition();
-                pictureBox2.Invalidate();
-                System.Diagnostics.Debug.WriteLine($"White circle placed at: {whiteCirclePosition}");
+                // Get the actual displayed image rectangle
+                Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
+                
+                if (displayRect.Width > 0 && displayRect.Height > 0)
+                {
+                    // Calculate position relative to the actual image area (not the PictureBox)
+                    int imageX = e.Location.X - displayRect.X;
+                    int imageY = e.Location.Y - displayRect.Y;
+                    
+                    // Store as percentage of the actual image display area
+                    float relativeX = (float)imageX / displayRect.Width;
+                    float relativeY = (float)imageY / displayRect.Height;
+                    
+                    // Clamp to 0-1 range (in case click is in letterbox area)
+                    relativeX = Math.Max(0, Math.Min(1, relativeX));
+                    relativeY = Math.Max(0, Math.Min(1, relativeY));
+                    
+                    whiteCirclePositionRelative = new PointF(relativeX, relativeY);
+                    whiteCirclePosition = e.Location;
+                    whiteCircleRadius = circleRadius;
+                    
+                    SaveWhiteCirclePosition();
+                    pictureBox2.Invalidate();
+                    System.Diagnostics.Debug.WriteLine($"White circle placed at: {whiteCirclePosition} ({relativeX:P1}, {relativeY:P1}) in display rect {displayRect} with radius: {whiteCircleRadius}");
+                }
             }
         }
 
         private void PictureBox2_Paint(object? sender, PaintEventArgs e)
         {
-            // Draw white circle (permanent marker)
+            // Draw white circle (permanent marker) - use saved radius
             if (whiteCirclePosition.HasValue)
             {
                 using (Pen whitePen = new Pen(Color.White, 2))
                 {
-                    int x = whiteCirclePosition.Value.X - circleRadius;
-                    int y = whiteCirclePosition.Value.Y - circleRadius;
-                    e.Graphics.DrawEllipse(whitePen, x, y, circleRadius * 2, circleRadius * 2);
+                    int x = whiteCirclePosition.Value.X - whiteCircleRadius;
+                    int y = whiteCirclePosition.Value.Y - whiteCircleRadius;
+                    e.Graphics.DrawEllipse(whitePen, x, y, whiteCircleRadius * 2, whiteCircleRadius * 2);
                 }
             }
 
@@ -703,12 +737,19 @@ namespace TelescopeWatcher
                 if (File.Exists(configPath))
                 {
                     string[] lines = File.ReadAllLines(configPath);
-                    if (lines.Length >= 2)
+                    if (lines.Length >= 3)
                     {
-                        int x = int.Parse(lines[0]);
-                        int y = int.Parse(lines[1]);
-                        whiteCirclePosition = new Point(x, y);
-                        System.Diagnostics.Debug.WriteLine($"Loaded white circle position: {whiteCirclePosition}");
+                        float relativeX = float.Parse(lines[0]);
+                        float relativeY = float.Parse(lines[1]);
+                        int radius = int.Parse(lines[2]);
+                        
+                        whiteCirclePositionRelative = new PointF(relativeX, relativeY);
+                        whiteCircleRadius = radius;
+                        
+                        // Calculate absolute position based on current PictureBox size
+                        UpdateWhiteCircleAbsolutePosition();
+                        
+                        System.Diagnostics.Debug.WriteLine($"Loaded white circle relative position: ({relativeX:P1}, {relativeY:P1}) with radius: {whiteCircleRadius}");
                         
                         // Force repaint to show the loaded circle
                         if (pictureBox2 != null)
@@ -728,21 +769,72 @@ namespace TelescopeWatcher
         {
             try
             {
-                if (whiteCirclePosition.HasValue)
+                if (whiteCirclePositionRelative.HasValue)
                 {
                     string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "circle_position.txt");
                     File.WriteAllLines(configPath, new[]
                     {
-                        whiteCirclePosition.Value.X.ToString(),
-                        whiteCirclePosition.Value.Y.ToString()
+                        whiteCirclePositionRelative.Value.X.ToString("F6"),  // Save as decimal (0.0 to 1.0)
+                        whiteCirclePositionRelative.Value.Y.ToString("F6"),
+                        whiteCircleRadius.ToString()
                     });
-                    System.Diagnostics.Debug.WriteLine($"Saved white circle position: {whiteCirclePosition}");
+                    System.Diagnostics.Debug.WriteLine($"Saved white circle relative position: ({whiteCirclePositionRelative.Value.X:P1}, {whiteCirclePositionRelative.Value.Y:P1}) with radius: {whiteCircleRadius}");
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error saving white circle position: {ex.Message}");
             }
+        }
+
+        private void UpdateWhiteCircleAbsolutePosition()
+        {
+            if (whiteCirclePositionRelative.HasValue && pictureBox2 != null && pictureBox2.Image != null)
+            {
+                // Get the actual displayed image rectangle within the PictureBox (accounts for Zoom mode)
+                Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
+                
+                if (displayRect.Width > 0 && displayRect.Height > 0)
+                {
+                    int absoluteX = displayRect.X + (int)(whiteCirclePositionRelative.Value.X * displayRect.Width);
+                    int absoluteY = displayRect.Y + (int)(whiteCirclePositionRelative.Value.Y * displayRect.Height);
+                    whiteCirclePosition = new Point(absoluteX, absoluteY);
+                    System.Diagnostics.Debug.WriteLine($"Updated absolute position: {whiteCirclePosition} from relative ({whiteCirclePositionRelative.Value.X:P1}, {whiteCirclePositionRelative.Value.Y:P1}) for display rect {displayRect}");
+                }
+            }
+        }
+
+        private Rectangle GetImageDisplayRectangle(PictureBox pictureBox)
+        {
+            if (pictureBox.Image == null)
+                return Rectangle.Empty;
+
+            // Calculate the actual display rectangle of the image within the PictureBox
+            // when SizeMode is Zoom (maintains aspect ratio)
+            
+            float imageAspect = (float)pictureBox.Image.Width / pictureBox.Image.Height;
+            float containerAspect = (float)pictureBox.Width / pictureBox.Height;
+
+            int displayWidth, displayHeight, displayX, displayY;
+
+            if (imageAspect > containerAspect)
+            {
+                // Image is wider - fit to width, letterbox top/bottom
+                displayWidth = pictureBox.Width;
+                displayHeight = (int)(pictureBox.Width / imageAspect);
+                displayX = 0;
+                displayY = (pictureBox.Height - displayHeight) / 2;
+            }
+            else
+            {
+                // Image is taller - fit to height, letterbox left/right
+                displayHeight = pictureBox.Height;
+                displayWidth = (int)(pictureBox.Height * imageAspect);
+                displayX = (pictureBox.Width - displayWidth) / 2;
+                displayY = 0;
+            }
+
+            return new Rectangle(displayX, displayY, displayWidth, displayHeight);
         }
 
         #endregion
