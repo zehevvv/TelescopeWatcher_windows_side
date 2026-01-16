@@ -18,6 +18,10 @@ namespace TelescopeWatcher
         private RadioButton radioSecondaryOnly;
         private RadioButton radioBoth;
         private Panel controlPanel;
+        private Button btnAddCircle;
+        private Button btnCircleSizeIncrease;
+        private Button btnCircleSizeDecrease;
+        private Label lblCircleSize;
         private readonly string mjpegUrl1;
         private readonly string mjpegUrl2;
         private HttpClient? httpClient1;
@@ -34,6 +38,14 @@ namespace TelescopeWatcher
         private DateTime lastFpsUpdate2 = DateTime.Now;
         private bool flipHorizontal = true;
         private bool flipVertical = true;
+        
+        // Circle overlay fields
+        private bool isAddingCircle = false;
+        private Point? whiteCirclePosition = null;
+        private int circleRadius = 30;
+        private const int MIN_RADIUS = 10;
+        private const int MAX_RADIUS = 200;
+        private Point currentMousePosition;
 
         public VideoPlayerForm(string serverUrl)
         {
@@ -41,6 +53,7 @@ namespace TelescopeWatcher
             this.mjpegUrl2 = $"{serverUrl}:8081/?action=stream";
             InitializeComponent();
             this.FormClosing += VideoPlayerForm_FormClosing;
+            LoadWhiteCirclePosition();
         }
 
         private void InitializeComponent()
@@ -136,11 +149,64 @@ namespace TelescopeWatcher
             };
             chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
 
+            // Circle control buttons
+            btnAddCircle = new Button
+            {
+                Text = "Add Red Circle",
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                BackColor = System.Drawing.Color.DarkRed,
+                FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(580, 5),
+                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
+                Padding = new Padding(5, 2, 5, 2)
+            };
+            btnAddCircle.Click += BtnAddCircle_Click;
+
+            btnCircleSizeDecrease = new Button
+            {
+                Text = "?",
+                Width = 30,
+                Height = 25,
+                ForeColor = System.Drawing.Color.White,
+                BackColor = System.Drawing.Color.DarkSlateGray,
+                FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(720, 5),
+                Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold)
+            };
+            btnCircleSizeDecrease.Click += BtnCircleSizeDecrease_Click;
+
+            lblCircleSize = new Label
+            {
+                Text = $"? {circleRadius}",
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(755, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+
+            btnCircleSizeIncrease = new Button
+            {
+                Text = "+",
+                Width = 30,
+                Height = 25,
+                ForeColor = System.Drawing.Color.White,
+                BackColor = System.Drawing.Color.DarkSlateGray,
+                FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(810, 5),
+                Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold)
+            };
+            btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
+
             controlPanel.Controls.Add(radioMainOnly);
             controlPanel.Controls.Add(radioSecondaryOnly);
             controlPanel.Controls.Add(radioBoth);
             controlPanel.Controls.Add(chkFlipHorizontal);
             controlPanel.Controls.Add(chkFlipVertical);
+            controlPanel.Controls.Add(btnAddCircle);
+            controlPanel.Controls.Add(btnCircleSizeDecrease);
+            controlPanel.Controls.Add(lblCircleSize);
+            controlPanel.Controls.Add(btnCircleSizeIncrease);
 
             // Video panel container
             videoPanel = new Panel
@@ -165,6 +231,7 @@ namespace TelescopeWatcher
                 Dock = DockStyle.Right,
                 Width = 600
             };
+            pictureBox2.Paint += PictureBox2_Paint;
 
             // Frame info labels
             lblFrameInfo1 = new Label
@@ -355,7 +422,7 @@ namespace TelescopeWatcher
                                             if (flipHorizontal || flipVertical)
                                             {
                                                 var bitmap = new Bitmap(image);
-                                                
+                                            
                                                 if (flipHorizontal && flipVertical)
                                                 {
                                                     bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
@@ -368,7 +435,7 @@ namespace TelescopeWatcher
                                                 {
                                                     bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
                                                 }
-                                                
+                                            
                                                 UpdateImage(bitmap, streamId);
                                                 image.Dispose();
                                             }
@@ -385,7 +452,7 @@ namespace TelescopeWatcher
                                                 if (elapsed > 0)
                                                 {
                                                     double fps = 1.0 / elapsed;
-                                                    
+                                                
                                                     // Only update FPS display every 500ms to reduce flicker
                                                     if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
                                                     {
@@ -403,7 +470,7 @@ namespace TelescopeWatcher
                                                 if (elapsed > 0)
                                                 {
                                                     double fps = 1.0 / elapsed;
-                                                    
+                                                
                                                     // Only update FPS display every 500ms to reduce flicker
                                                     if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
                                                     {
@@ -533,5 +600,143 @@ namespace TelescopeWatcher
             flipVertical = chkFlipVertical.Checked;
             System.Diagnostics.Debug.WriteLine($"Flip Vertical: {flipVertical}");
         }
+
+        #region Circle Overlay Methods
+
+        private void BtnAddCircle_Click(object? sender, EventArgs e)
+        {
+            isAddingCircle = !isAddingCircle;
+            
+            if (isAddingCircle)
+            {
+                btnAddCircle.Text = "Stop Adding";
+                btnAddCircle.BackColor = System.Drawing.Color.DarkGreen;
+                
+                // Wire up mouse events for pictureBox2
+                pictureBox2.MouseMove += PictureBox2_MouseMove;
+                pictureBox2.MouseClick += PictureBox2_MouseClick;
+                pictureBox2.Paint += PictureBox2_Paint;
+                pictureBox2.Invalidate();
+            }
+            else
+            {
+                btnAddCircle.Text = "Add Red Circle";
+                btnAddCircle.BackColor = System.Drawing.Color.DarkRed;
+                
+                // Unwire mouse events
+                pictureBox2.MouseMove -= PictureBox2_MouseMove;
+                pictureBox2.MouseClick -= PictureBox2_MouseClick;
+                pictureBox2.Invalidate();
+            }
+        }
+
+        private void BtnCircleSizeIncrease_Click(object? sender, EventArgs e)
+        {
+            if (circleRadius < MAX_RADIUS)
+            {
+                circleRadius += 5;
+                lblCircleSize.Text = $"? {circleRadius}";
+                pictureBox2.Invalidate();
+            }
+        }
+
+        private void BtnCircleSizeDecrease_Click(object? sender, EventArgs e)
+        {
+            if (circleRadius > MIN_RADIUS)
+            {
+                circleRadius -= 5;
+                lblCircleSize.Text = $"? {circleRadius}";
+                pictureBox2.Invalidate();
+            }
+        }
+
+        private void PictureBox2_MouseMove(object? sender, MouseEventArgs e)
+        {
+            currentMousePosition = e.Location;
+            pictureBox2.Invalidate();
+        }
+
+        private void PictureBox2_MouseClick(object? sender, MouseEventArgs e)
+        {
+            if (isAddingCircle && e.Button == MouseButtons.Left)
+            {
+                // Set white circle at click position
+                whiteCirclePosition = e.Location;
+                SaveWhiteCirclePosition();
+                pictureBox2.Invalidate();
+                System.Diagnostics.Debug.WriteLine($"White circle placed at: {whiteCirclePosition}");
+            }
+        }
+
+        private void PictureBox2_Paint(object? sender, PaintEventArgs e)
+        {
+            // Draw white circle (permanent marker)
+            if (whiteCirclePosition.HasValue)
+            {
+                using (Pen whitePen = new Pen(Color.White, 2))
+                {
+                    int x = whiteCirclePosition.Value.X - circleRadius;
+                    int y = whiteCirclePosition.Value.Y - circleRadius;
+                    e.Graphics.DrawEllipse(whitePen, x, y, circleRadius * 2, circleRadius * 2);
+                }
+            }
+
+            // Draw red circle (cursor preview)
+            if (isAddingCircle)
+            {
+                using (Pen redPen = new Pen(Color.Red, 2))
+                {
+                    int x = currentMousePosition.X - circleRadius;
+                    int y = currentMousePosition.Y - circleRadius;
+                    e.Graphics.DrawEllipse(redPen, x, y, circleRadius * 2, circleRadius * 2);
+                }
+            }
+        }
+
+        private void LoadWhiteCirclePosition()
+        {
+            try
+            {
+                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "circle_position.txt");
+                if (File.Exists(configPath))
+                {
+                    string[] lines = File.ReadAllLines(configPath);
+                    if (lines.Length >= 2)
+                    {
+                        int x = int.Parse(lines[0]);
+                        int y = int.Parse(lines[1]);
+                        whiteCirclePosition = new Point(x, y);
+                        System.Diagnostics.Debug.WriteLine($"Loaded white circle position: {whiteCirclePosition}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading white circle position: {ex.Message}");
+            }
+        }
+
+        private void SaveWhiteCirclePosition()
+        {
+            try
+            {
+                if (whiteCirclePosition.HasValue)
+                {
+                    string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "circle_position.txt");
+                    File.WriteAllLines(configPath, new[]
+                    {
+                        whiteCirclePosition.Value.X.ToString(),
+                        whiteCirclePosition.Value.Y.ToString()
+                    });
+                    System.Diagnostics.Debug.WriteLine($"Saved white circle position: {whiteCirclePosition}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error saving white circle position: {ex.Message}");
+            }
+        }
+
+        #endregion
     }
 }
