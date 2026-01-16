@@ -318,6 +318,8 @@ namespace TelescopeWatcher
 
         private async void VideoPlayerForm_Load(object? sender, EventArgs e)
         {
+            // Reload circle position after form is fully loaded
+            LoadWhiteCirclePosition();
             await StartStreaming();
         }
 
@@ -707,6 +709,12 @@ namespace TelescopeWatcher
                         int y = int.Parse(lines[1]);
                         whiteCirclePosition = new Point(x, y);
                         System.Diagnostics.Debug.WriteLine($"Loaded white circle position: {whiteCirclePosition}");
+                        
+                        // Force repaint to show the loaded circle
+                        if (pictureBox2 != null)
+                        {
+                            pictureBox2.Invalidate();
+                        }
                     }
                 }
             }
