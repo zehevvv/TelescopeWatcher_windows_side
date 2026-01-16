@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Text;
 
 namespace TelescopeWatcher
@@ -180,7 +180,7 @@ namespace TelescopeWatcher
 
             lblCircleSize = new Label
             {
-                Text = $"? {circleRadius}",
+                Text = $"⭕ {circleRadius}",
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
                 Location = new System.Drawing.Point(755, 8),
@@ -541,8 +541,17 @@ namespace TelescopeWatcher
             }
 
             var oldImage = pictureBox.Image;
+            bool wasFirstFrame = (oldImage == null && streamId == 2);
+            
             pictureBox.Image = image;
             oldImage?.Dispose();
+            
+            // If this is the first frame of secondary camera, recalculate circle position
+            if (wasFirstFrame && whiteCirclePositionRelative.HasValue)
+            {
+                UpdateWhiteCircleAbsolutePosition();
+                pictureBox2.Invalidate();
+            }
         }
 
         private void UpdateStatus(string text, System.Drawing.Color color)
@@ -651,7 +660,7 @@ namespace TelescopeWatcher
             if (circleRadius < MAX_RADIUS)
             {
                 circleRadius += 5;
-                lblCircleSize.Text = $"? {circleRadius}";
+                lblCircleSize.Text = $"⭕ {circleRadius}";
                 pictureBox2.Invalidate();
             }
         }
@@ -661,7 +670,7 @@ namespace TelescopeWatcher
             if (circleRadius > MIN_RADIUS)
             {
                 circleRadius -= 5;
-                lblCircleSize.Text = $"? {circleRadius}";
+                lblCircleSize.Text = $"⭕ {circleRadius}";
                 pictureBox2.Invalidate();
             }
         }
