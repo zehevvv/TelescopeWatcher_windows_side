@@ -185,18 +185,31 @@ namespace TelescopeWatcher
             };
             chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
 
-            btnAddCircle = new Button
+            // Circle controls - positioned from the right using Anchor
+            btnCircleSizeIncrease = new Button
             {
-                Text = "Add Circle",
-                AutoSize = true,
+                Text = "+",
+                Width = 30,
+                Height = 28,
                 ForeColor = System.Drawing.Color.White,
-                BackColor = System.Drawing.Color.DarkRed,
+                BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(580, 5),
-                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
-                Padding = new Padding(5, 2, 5, 2)
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
-            btnAddCircle.Click += BtnAddCircle_Click;
+            btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
+
+            lblCircleSize = new Label
+            {
+                Text = $"{circleRadius}",
+                Width = 40,
+                Height = 20,
+                ForeColor = System.Drawing.Color.White,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
 
             btnCircleSizeDecrease = new Button
             {
@@ -206,35 +219,26 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(720, 3),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
             btnCircleSizeDecrease.Click += BtnCircleSizeDecrease_Click;
 
-            lblCircleSize = new Label
+            btnAddCircle = new Button
             {
-                Text = $"{circleRadius}",
+                Text = "Add Circle",
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(755, 8),
-                Font = new System.Drawing.Font("Segoe UI", 9F)
-            };
-
-            btnCircleSizeIncrease = new Button
-            {
-                Text = "+",
-                Width = 30,
-                Height = 28,
-                ForeColor = System.Drawing.Color.White,
-                BackColor = System.Drawing.Color.DarkSlateGray,
+                BackColor = System.Drawing.Color.DarkRed,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(810, 3),
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
+                Padding = new Padding(5, 2, 5, 2)
             };
-            btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
+            btnAddCircle.Click += BtnAddCircle_Click;
 
+            // Add controls to panel first, then set positions
             controlPanel.Controls.Add(radioMainOnly);
             controlPanel.Controls.Add(radioSecondaryOnly);
             controlPanel.Controls.Add(radioBoth);
@@ -244,7 +248,11 @@ namespace TelescopeWatcher
             controlPanel.Controls.Add(btnCircleSizeDecrease);
             controlPanel.Controls.Add(lblCircleSize);
             controlPanel.Controls.Add(btnCircleSizeIncrease);
-
+            
+            // Position circle controls from the right after being added
+            controlPanel.Resize += (s, e) => PositionCircleControls();
+            PositionCircleControls();
+            
             videoPanel = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -317,6 +325,23 @@ namespace TelescopeWatcher
             this.Resize += VideoPlayerForm_Resize;
             this.KeyDown += VideoPlayerForm_KeyDown;
             this.KeyUp += VideoPlayerForm_KeyUp;
+        }
+
+        private void PositionCircleControls()
+        {
+            if (controlPanel == null) return;
+            
+            int rightMargin = 10;
+            int yPos = 3;
+            
+            // Position from right to left: + button, label, - button, Add Circle button
+            btnCircleSizeIncrease.Location = new System.Drawing.Point(controlPanel.Width - rightMargin - btnCircleSizeIncrease.Width, yPos);
+            
+            lblCircleSize.Location = new System.Drawing.Point(btnCircleSizeIncrease.Left - 5 - lblCircleSize.Width, yPos + 5);
+            
+            btnCircleSizeDecrease.Location = new System.Drawing.Point(lblCircleSize.Left - 5 - btnCircleSizeDecrease.Width, yPos);
+            
+            btnAddCircle.Location = new System.Drawing.Point(btnCircleSizeDecrease.Left - 10 - btnAddCircle.Width, yPos + 2);
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
