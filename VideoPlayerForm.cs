@@ -64,9 +64,9 @@ namespace TelescopeWatcher
             this.Size = new System.Drawing.Size(1200, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable;
-            this.MinimumSize = new System.Drawing.Size(600, 400);
+            this.MinimumSize = new System.Drawing.Size(800, 400); // Increased min width a bit
             
-            // Enable double buffering to reduce flicker
+            // Enable double buffering
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | 
                           ControlStyles.AllPaintingInWmPaint | 
@@ -84,35 +84,62 @@ namespace TelescopeWatcher
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
             };
 
-            // Control panel for options
+            // Control panel
             controlPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 35,
+                Height = 40,
                 BackColor = System.Drawing.Color.FromArgb(45, 45, 48),
-                Padding = new Padding(10, 5, 10, 5)
+                Padding = new Padding(0)
             };
 
-            // Calculate available width and divide by number of controls
-            int availableWidth = this.ClientSize.Width - 20; // Subtract left and right padding
-            int totalControls = 9; // 3 radio buttons + 2 checkboxes + 1 button + 3 circle controls
-            int controlWidth = availableWidth / totalControls;
-            int currentX = 10;
-            int yPosition = 8;
+            // Main Layout Table
+            TableLayoutPanel mainLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                BackColor = System.Drawing.Color.Transparent
+            };
+            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65F)); // Left side for camera options
+            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F)); // Right side for circle options
+            controlPanel.Controls.Add(mainLayout);
 
-            // Stream selection radio buttons
+            // Left Flow Layout (Camera Selection & Flip)
+            FlowLayoutPanel leftPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Padding = new Padding(5, 8, 0, 0),
+                AutoSize = false
+            };
+
+            // Right Flow Layout (Circle Controls) - Right to Left for alignment
+            FlowLayoutPanel rightPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                Padding = new Padding(0, 3, 5, 0),
+                AutoSize = false
+            };
+
+            mainLayout.Controls.Add(leftPanel, 0, 0);
+            mainLayout.Controls.Add(rightPanel, 1, 0);
+
+            // Left Side Controls
             radioMainOnly = new RadioButton
             {
                 Text = "Main Camera",
                 Checked = false,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(currentX, yPosition),
-                Font = new System.Drawing.Font("Segoe UI", 9F)
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                Margin = new Padding(0, 0, 10, 0)
             };
             radioMainOnly.CheckedChanged += RadioStream_CheckedChanged;
-            controlPanel.Controls.Add(radioMainOnly);
-            currentX += controlWidth;
+            leftPanel.Controls.Add(radioMainOnly);
 
             radioSecondaryOnly = new RadioButton
             {
@@ -120,12 +147,11 @@ namespace TelescopeWatcher
                 Checked = false,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(currentX, yPosition),
-                Font = new System.Drawing.Font("Segoe UI", 9F)
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                Margin = new Padding(0, 0, 10, 0)
             };
             radioSecondaryOnly.CheckedChanged += RadioStream_CheckedChanged;
-            controlPanel.Controls.Add(radioSecondaryOnly);
-            currentX += controlWidth;
+            leftPanel.Controls.Add(radioSecondaryOnly);
 
             radioBoth = new RadioButton
             {
@@ -133,42 +159,39 @@ namespace TelescopeWatcher
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(currentX, yPosition),
-                Font = new System.Drawing.Font("Segoe UI", 9F)
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                Margin = new Padding(0, 0, 20, 0)
             };
             radioBoth.CheckedChanged += RadioStream_CheckedChanged;
-            controlPanel.Controls.Add(radioBoth);
-            currentX += controlWidth;
+            leftPanel.Controls.Add(radioBoth);
 
-            // Horizontal flip checkbox
             chkFlipHorizontal = new CheckBox
             {
                 Text = "Flip H",
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(currentX, yPosition),
-                Font = new System.Drawing.Font("Segoe UI", 9F)
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                Margin = new Padding(0, 0, 10, 0)
             };
             chkFlipHorizontal.CheckedChanged += ChkFlipHorizontal_CheckedChanged;
-            controlPanel.Controls.Add(chkFlipHorizontal);
-            currentX += controlWidth;
+            leftPanel.Controls.Add(chkFlipHorizontal);
 
-            // Vertical flip checkbox
             chkFlipVertical = new CheckBox
             {
                 Text = "Flip V",
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(currentX, yPosition),
-                Font = new System.Drawing.Font("Segoe UI", 9F)
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                Margin = new Padding(0, 0, 0, 0)
             };
             chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
-            controlPanel.Controls.Add(chkFlipVertical);
-            currentX += controlWidth;
+            leftPanel.Controls.Add(chkFlipVertical);
 
-            // Circle control buttons
+            // Right Side Controls (Added in reverse order because of RightToLeft flow)
+            
+            // 4. Add Circle Button (Far Right)
             btnAddCircle = new Button
             {
                 Text = "Add Circle",
@@ -176,41 +199,14 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkRed,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(currentX, 5),
                 Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
-                Padding = new Padding(5, 2, 5, 2)
+                Padding = new Padding(8, 2, 8, 2),
+                Margin = new Padding(10, 2, 0, 0)
             };
             btnAddCircle.Click += BtnAddCircle_Click;
-            controlPanel.Controls.Add(btnAddCircle);
-            currentX += controlWidth;
+            rightPanel.Controls.Add(btnAddCircle);
 
-            btnCircleSizeDecrease = new Button
-            {
-                Text = "-",
-                Width = 30,
-                Height = 28,
-                ForeColor = System.Drawing.Color.White,
-                BackColor = System.Drawing.Color.DarkSlateGray,
-                FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(currentX, 3),
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
-            };
-            btnCircleSizeDecrease.Click += BtnCircleSizeDecrease_Click;
-            controlPanel.Controls.Add(btnCircleSizeDecrease);
-            currentX += controlWidth;
-
-            lblCircleSize = new Label
-            {
-                Text = $"{circleRadius}",
-                AutoSize = true,
-                ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(currentX, yPosition),
-                Font = new System.Drawing.Font("Segoe UI", 9F)
-            };
-            controlPanel.Controls.Add(lblCircleSize);
-            currentX += controlWidth;
-
+            // 3. Plus Button
             btnCircleSizeIncrease = new Button
             {
                 Text = "+",
@@ -219,21 +215,49 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(currentX, 3),
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+                Margin = new Padding(0, 0, 0, 0)
             };
             btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
-            controlPanel.Controls.Add(btnCircleSizeIncrease);
+            rightPanel.Controls.Add(btnCircleSizeIncrease);
 
-            // Video panel container
+            // 2. Size Label
+            lblCircleSize = new Label
+            {
+                Text = $"{circleRadius}",
+                Width = 40,
+                ForeColor = System.Drawing.Color.White,
+                Font = new System.Drawing.Font("Segoe UI", 9F),
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+                Margin = new Padding(0, 5, 0, 0)
+            };
+            rightPanel.Controls.Add(lblCircleSize);
+
+            // 1. Minus Button
+            btnCircleSizeDecrease = new Button
+            {
+                Text = "-",
+                Width = 30,
+                Height = 28,
+                ForeColor = System.Drawing.Color.White,
+                BackColor = System.Drawing.Color.DarkSlateGray,
+                FlatStyle = FlatStyle.Flat,
+                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+                Margin = new Padding(0, 0, 0, 0)
+            };
+            btnCircleSizeDecrease.Click += BtnCircleSizeDecrease_Click;
+            rightPanel.Controls.Add(btnCircleSizeDecrease);
+
+            // Video panel
             videoPanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = System.Drawing.Color.Black
             };
 
-            // Picture box 1 (Main camera)
+            // Pictures
             pictureBox1 = new PictureBox
             {
                 SizeMode = PictureBoxSizeMode.Zoom,
@@ -241,7 +265,6 @@ namespace TelescopeWatcher
                 Dock = DockStyle.Fill
             };
 
-            // Picture box 2 (Secondary camera)
             pictureBox2 = new PictureBox
             {
                 SizeMode = PictureBoxSizeMode.Zoom,
@@ -251,7 +274,7 @@ namespace TelescopeWatcher
             };
             pictureBox2.Paint += PictureBox2_Paint;
 
-            // Frame info labels
+            // Frame info
             lblFrameInfo1 = new Label
             {
                 Text = "Main: Frame 0 | FPS: 0.0",
@@ -308,29 +331,6 @@ namespace TelescopeWatcher
             // Recalculate circle position when window is resized
             UpdateWhiteCircleAbsolutePosition();
             pictureBox2.Invalidate();
-            
-            // Reposition control panel items dynamically
-            if (controlPanel != null && controlPanel.Controls.Count > 0)
-            {
-                int availableWidth = this.ClientSize.Width - 20;
-                int totalControls = 9;
-                int controlWidth = availableWidth / totalControls;
-                int currentX = 10;
-                int yPosition = 8;
-                
-                foreach (Control control in controlPanel.Controls)
-                {
-                    if (control is RadioButton || control is CheckBox || control is Label)
-                    {
-                        control.Location = new System.Drawing.Point(currentX, yPosition);
-                    }
-                    else if (control is Button)
-                    {
-                        control.Location = new System.Drawing.Point(currentX, 3);
-                    }
-                    currentX += controlWidth;
-                }
-            }
         }
 
         private void RadioStream_CheckedChanged(object? sender, EventArgs e)
