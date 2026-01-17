@@ -13,6 +13,52 @@ A Windows Forms application for managing serial COM port connections to telescop
 
 - .NET 8.0 or later
 - Windows operating system
+- Visual Studio 2022 (recommended) or Visual Studio Code
+
+## Project Structure
+
+This is a proper Visual Studio solution with the following structure:
+
+- **TelescopeWatcher.sln** - Visual Studio solution file
+- **TelescopeWatcher.csproj** - WinForms project file
+- All source code files (.cs)
+
+## Opening the Project
+
+### Using Visual Studio
+
+1. Double-click `TelescopeWatcher.sln` or
+2. Open Visual Studio ? File ? Open ? Project/Solution ? Select `TelescopeWatcher.sln`
+
+### Using Visual Studio Code
+
+1. Open the folder in VS Code
+2. The C# extension will automatically detect the solution
+
+## Building
+
+### From Visual Studio
+
+- Press `F6` or use Build ? Build Solution
+
+### From Command Line
+
+  ```bash
+  dotnet restore TelescopeWatcher.sln
+  dotnet build TelescopeWatcher.sln
+  ```
+
+## Running
+
+### From Visual Studio
+
+- Press `F5` to run with debugging or `Ctrl+F5` to run without debugging
+
+### From Command Line
+
+  ```bash
+  dotnet run --project TelescopeWatcher.csproj
+  ```
 
 ## Usage
 
@@ -31,14 +77,6 @@ A Windows Forms application for managing serial COM port connections to telescop
 - Stop Bits: 1
 - Handshake: None
 
-## Building
+## Dependencies
 
-```bash
-dotnet build
-```
-
-## Running
-
-```bash
-dotnet run
-```
+- System.IO.Ports (8.0.0) - For serial port communication
