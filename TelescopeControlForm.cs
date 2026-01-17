@@ -189,7 +189,19 @@ namespace TelescopeWatcher
                         {
                             string baseUrl = $"{uri.Scheme}://{uri.Host}";
 
-                            videoPlayerForm = new VideoPlayerForm(baseUrl);
+                            // Get current steps per second from trackbar
+                            int trackBarValue = trackBarStepsPerSecond.Value;
+                            int stepsPerSecond = stepsPerSecondValues[trackBarValue];
+
+                            // Pass telescope control dependencies to video player
+                            videoPlayerForm = new VideoPlayerForm(
+                                baseUrl, 
+                                serialPort, 
+                                serverClient, 
+                                stepsPerSecond, 
+                                focusSpeed,
+                                AddLogMessage
+                            );
                             videoPlayerForm.Show();
                             videoPlayerForm.FormClosed += (s, args) =>
                             {
@@ -251,7 +263,20 @@ namespace TelescopeWatcher
                             try
                             {
                                 string baseUrl = $"{uri.Scheme}://{uri.Host}";
-                                videoPlayerForm = new VideoPlayerForm(baseUrl);
+                                
+                                // Get current steps per second from trackbar
+                                int trackBarValue = trackBarStepsPerSecond.Value;
+                                int stepsPerSecond = stepsPerSecondValues[trackBarValue];
+                                
+                                // Pass telescope control dependencies to video player
+                                videoPlayerForm = new VideoPlayerForm(
+                                    baseUrl, 
+                                    serialPort, 
+                                    serverClient, 
+                                    stepsPerSecond, 
+                                    focusSpeed,
+                                    AddLogMessage
+                                );
                                 videoPlayerForm.Show();
                                 videoPlayerForm.FormClosed += (s, args) =>
                                 {

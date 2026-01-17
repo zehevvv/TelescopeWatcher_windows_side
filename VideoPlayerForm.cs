@@ -1,5 +1,6 @@
-﻿using System.Net.Http;
+using System.Net.Http;
 using System.Text;
+using System.IO.Ports;
 
 namespace TelescopeWatcher
 {
@@ -42,20 +43,57 @@ namespace TelescopeWatcher
         // Circle overlay fields
         private bool isAddingCircle = false;
         private Point? whiteCirclePosition = null;
-        private PointF? whiteCirclePositionRelative = null;  // Store as percentage (0.0 to 1.0)
+        private PointF? whiteCirclePositionRelative = null;
         private int whiteCircleRadius = 30;
         private int circleRadius = 30;
         private const int MIN_RADIUS = 10;
         private const int MAX_RADIUS = 200;
         private Point currentMousePosition;
 
-        public VideoPlayerForm(string serverUrl)
+        // Telescope control fields
+        private SerialPort? serialPort;
+        private SerialServerClient? serverClient;
+        private bool isServerMode = false;
+        private bool isKeyPressed = false;
+        private bool isFocusKeyPressed = false;
+        private string currentDirection = "";
+        private string currentFocusDirection = "";
+        private System.Windows.Forms.Timer commandTimer;
+        private System.Windows.Forms.Timer focusTimer;
+        private int timeBetweenSteps = 10;
+        private int focusSpeed = 9;
+        private Action<string>? logCallback;
+
+        public VideoPlayerForm(string serverUrl, SerialPort? port = null, SerialServerClient? client = null, 
+                               int stepsPerSecond = 100, int focusMotorSpeed = 9, Action<string>? logCallback = null)
         {
             this.mjpegUrl1 = $"{serverUrl}:8080/?action=stream";
             this.mjpegUrl2 = $"{serverUrl}:8081/?action=stream";
+            
+            this.serialPort = port;
+            this.serverClient = client;
+            this.isServerMode = (client != null);
+            this.focusSpeed = focusMotorSpeed;
+            this.logCallback = logCallback;
+            
+            double timeMs = 1000.0 / stepsPerSecond;
+            this.timeBetweenSteps = (int)Math.Round(timeMs);
+            if (stepsPerSecond == 10000)
+            {
+                this.timeBetweenSteps = 0;
+            }
+            
             InitializeComponent();
             this.FormClosing += VideoPlayerForm_FormClosing;
             LoadWhiteCirclePosition();
+            
+            commandTimer = new System.Windows.Forms.Timer();
+            commandTimer.Interval = 200;
+            commandTimer.Tick += CommandTimer_Tick;
+
+            focusTimer = new System.Windows.Forms.Timer();
+            focusTimer.Interval = 100;
+            focusTimer.Tick += FocusTimer_Tick;
         }
 
         private void InitializeComponent()
@@ -64,15 +102,15 @@ namespace TelescopeWatcher
             this.Size = new System.Drawing.Size(1200, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable;
-            this.MinimumSize = new System.Drawing.Size(800, 400); // Increased min width a bit
+            this.MinimumSize = new System.Drawing.Size(600, 400);
             
-            // Enable double buffering
+            this.KeyPreview = true;
+            
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | 
                           ControlStyles.AllPaintingInWmPaint | 
                           ControlStyles.UserPaint, true);
 
-            // Status label
             lblStatus = new Label
             {
                 Text = "Connecting to streams...",
@@ -84,62 +122,24 @@ namespace TelescopeWatcher
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
             };
 
-            // Control panel
             controlPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 40,
+                Height = 35,
                 BackColor = System.Drawing.Color.FromArgb(45, 45, 48),
-                Padding = new Padding(0)
+                Padding = new Padding(10, 5, 10, 5)
             };
 
-            // Main Layout Table
-            TableLayoutPanel mainLayout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 2,
-                RowCount = 1,
-                BackColor = System.Drawing.Color.Transparent
-            };
-            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65F)); // Left side for camera options
-            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F)); // Right side for circle options
-            controlPanel.Controls.Add(mainLayout);
-
-            // Left Flow Layout (Camera Selection & Flip)
-            FlowLayoutPanel leftPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(5, 8, 0, 0),
-                AutoSize = false
-            };
-
-            // Right Flow Layout (Circle Controls) - Right to Left for alignment
-            FlowLayoutPanel rightPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.RightToLeft,
-                WrapContents = false,
-                Padding = new Padding(0, 3, 5, 0),
-                AutoSize = false
-            };
-
-            mainLayout.Controls.Add(leftPanel, 0, 0);
-            mainLayout.Controls.Add(rightPanel, 1, 0);
-
-            // Left Side Controls
             radioMainOnly = new RadioButton
             {
                 Text = "Main Camera",
                 Checked = false,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 9F),
-                Margin = new Padding(0, 0, 10, 0)
+                Location = new System.Drawing.Point(10, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             radioMainOnly.CheckedChanged += RadioStream_CheckedChanged;
-            leftPanel.Controls.Add(radioMainOnly);
 
             radioSecondaryOnly = new RadioButton
             {
@@ -147,11 +147,10 @@ namespace TelescopeWatcher
                 Checked = false,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 9F),
-                Margin = new Padding(0, 0, 10, 0)
+                Location = new System.Drawing.Point(130, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             radioSecondaryOnly.CheckedChanged += RadioStream_CheckedChanged;
-            leftPanel.Controls.Add(radioSecondaryOnly);
 
             radioBoth = new RadioButton
             {
@@ -159,11 +158,10 @@ namespace TelescopeWatcher
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 9F),
-                Margin = new Padding(0, 0, 20, 0)
+                Location = new System.Drawing.Point(280, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             radioBoth.CheckedChanged += RadioStream_CheckedChanged;
-            leftPanel.Controls.Add(radioBoth);
 
             chkFlipHorizontal = new CheckBox
             {
@@ -171,11 +169,10 @@ namespace TelescopeWatcher
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 9F),
-                Margin = new Padding(0, 0, 10, 0)
+                Location = new System.Drawing.Point(420, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             chkFlipHorizontal.CheckedChanged += ChkFlipHorizontal_CheckedChanged;
-            leftPanel.Controls.Add(chkFlipHorizontal);
 
             chkFlipVertical = new CheckBox
             {
@@ -183,15 +180,11 @@ namespace TelescopeWatcher
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 9F),
-                Margin = new Padding(0, 0, 0, 0)
+                Location = new System.Drawing.Point(500, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
-            leftPanel.Controls.Add(chkFlipVertical);
 
-            // Right Side Controls (Added in reverse order because of RightToLeft flow)
-            
-            // 4. Add Circle Button (Far Right)
             btnAddCircle = new Button
             {
                 Text = "Add Circle",
@@ -199,42 +192,12 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkRed,
                 FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(580, 5),
                 Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
-                Padding = new Padding(8, 2, 8, 2),
-                Margin = new Padding(10, 2, 0, 0)
+                Padding = new Padding(5, 2, 5, 2)
             };
             btnAddCircle.Click += BtnAddCircle_Click;
-            rightPanel.Controls.Add(btnAddCircle);
 
-            // 3. Plus Button
-            btnCircleSizeIncrease = new Button
-            {
-                Text = "+",
-                Width = 30,
-                Height = 28,
-                ForeColor = System.Drawing.Color.White,
-                BackColor = System.Drawing.Color.DarkSlateGray,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-                Margin = new Padding(0, 0, 0, 0)
-            };
-            btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
-            rightPanel.Controls.Add(btnCircleSizeIncrease);
-
-            // 2. Size Label
-            lblCircleSize = new Label
-            {
-                Text = $"{circleRadius}",
-                Width = 40,
-                ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 9F),
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-                Margin = new Padding(0, 5, 0, 0)
-            };
-            rightPanel.Controls.Add(lblCircleSize);
-
-            // 1. Minus Button
             btnCircleSizeDecrease = new Button
             {
                 Text = "-",
@@ -243,21 +206,51 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(720, 3),
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-                Margin = new Padding(0, 0, 0, 0)
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
             btnCircleSizeDecrease.Click += BtnCircleSizeDecrease_Click;
-            rightPanel.Controls.Add(btnCircleSizeDecrease);
 
-            // Video panel
+            lblCircleSize = new Label
+            {
+                Text = $"{circleRadius}",
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(755, 8),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+
+            btnCircleSizeIncrease = new Button
+            {
+                Text = "+",
+                Width = 30,
+                Height = 28,
+                ForeColor = System.Drawing.Color.White,
+                BackColor = System.Drawing.Color.DarkSlateGray,
+                FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(810, 3),
+                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
+            };
+            btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
+
+            controlPanel.Controls.Add(radioMainOnly);
+            controlPanel.Controls.Add(radioSecondaryOnly);
+            controlPanel.Controls.Add(radioBoth);
+            controlPanel.Controls.Add(chkFlipHorizontal);
+            controlPanel.Controls.Add(chkFlipVertical);
+            controlPanel.Controls.Add(btnAddCircle);
+            controlPanel.Controls.Add(btnCircleSizeDecrease);
+            controlPanel.Controls.Add(lblCircleSize);
+            controlPanel.Controls.Add(btnCircleSizeIncrease);
+
             videoPanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = System.Drawing.Color.Black
             };
 
-            // Pictures
             pictureBox1 = new PictureBox
             {
                 SizeMode = PictureBoxSizeMode.Zoom,
@@ -274,7 +267,6 @@ namespace TelescopeWatcher
             };
             pictureBox2.Paint += PictureBox2_Paint;
 
-            // Frame info
             lblFrameInfo1 = new Label
             {
                 Text = "Main: Frame 0 | FPS: 0.0",
@@ -302,7 +294,6 @@ namespace TelescopeWatcher
             videoPanel.Controls.Add(pictureBox1);
             videoPanel.Controls.Add(pictureBox2);
 
-            // Close button
             btnClose = new Button
             {
                 Text = "Close Stream",
@@ -324,11 +315,39 @@ namespace TelescopeWatcher
 
             this.Load += VideoPlayerForm_Load;
             this.Resize += VideoPlayerForm_Resize;
+            this.KeyDown += VideoPlayerForm_KeyDown;
+            this.KeyUp += VideoPlayerForm_KeyUp;
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            // WM_KEYDOWN = 0x100, WM_KEYUP = 0x101
+            const int WM_KEYDOWN = 0x100;
+            const int WM_KEYUP = 0x101;
+            
+            // Check if this is an arrow key or Page key
+            Keys key = keyData & Keys.KeyCode;
+            if (key == Keys.Up || key == Keys.Down || key == Keys.Left || key == Keys.Right ||
+                key == Keys.PageUp || key == Keys.PageDown)
+            {
+                if (msg.Msg == WM_KEYDOWN)
+                {
+                    var args = new KeyEventArgs(keyData);
+                    VideoPlayerForm_KeyDown(this, args);
+                }
+                else if (msg.Msg == WM_KEYUP)
+                {
+                    var args = new KeyEventArgs(keyData);
+                    VideoPlayerForm_KeyUp(this, args);
+                }
+                return true; // Prevent default behavior (radio button navigation)
+            }
+            
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void VideoPlayerForm_Resize(object? sender, EventArgs e)
         {
-            // Recalculate circle position when window is resized
             UpdateWhiteCircleAbsolutePosition();
             pictureBox2.Invalidate();
         }
@@ -364,14 +383,12 @@ namespace TelescopeWatcher
                 lblFrameInfo2.Visible = true;
             }
             
-            // Recalculate absolute position from relative when layout changes
             UpdateWhiteCircleAbsolutePosition();
             pictureBox2.Invalidate();
         }
 
         private async void VideoPlayerForm_Load(object? sender, EventArgs e)
         {
-            // Reload circle position after form is fully loaded
             LoadWhiteCirclePosition();
             await StartStreaming();
         }
@@ -390,7 +407,6 @@ namespace TelescopeWatcher
                 cancellationToken = new CancellationTokenSource();
                 isStreaming = true;
 
-                // Start both streams
                 streamTask1 = StartStreamTask(mjpegUrl1, 1);
                 streamTask2 = StartStreamTask(mjpegUrl2, 2);
 
@@ -436,6 +452,8 @@ namespace TelescopeWatcher
                         {
                             int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken.Token);
                             
+
+
                             if (bytesRead == 0)
                             {
                                 System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Ended");
@@ -446,6 +464,7 @@ namespace TelescopeWatcher
                             {
                                 frameBuffer.Add(buffer[i]);
                                 
+
                                 if (frameBuffer.Count < 2)
                                     continue;
                                 
@@ -478,6 +497,8 @@ namespace TelescopeWatcher
                                             {
                                                 var bitmap = new Bitmap(image);
                                             
+
+
                                                 if (flipHorizontal && flipVertical)
                                                 {
                                                     bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
@@ -491,6 +512,7 @@ namespace TelescopeWatcher
                                                     bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
                                                 }
                                             
+
                                                 UpdateImage(bitmap, streamId);
                                                 image.Dispose();
                                             }
@@ -508,7 +530,7 @@ namespace TelescopeWatcher
                                                 {
                                                     double fps = 1.0 / elapsed;
                                                 
-                                                    // Only update FPS display every 500ms to reduce flicker
+            
                                                     if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
                                                     {
                                                         UpdateFrameInfo(frameCount1, fps, 1);
@@ -526,7 +548,7 @@ namespace TelescopeWatcher
                                                 {
                                                     double fps = 1.0 / elapsed;
                                                 
-                                                    // Only update FPS display every 500ms to reduce flicker
+            
                                                     if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
                                                     {
                                                         UpdateFrameInfo(frameCount2, fps, 2);
@@ -585,7 +607,6 @@ namespace TelescopeWatcher
             pictureBox.Image = image;
             oldImage?.Dispose();
             
-            // If this is the first frame of secondary camera, recalculate circle position
             if (wasFirstFrame && whiteCirclePositionRelative.HasValue)
             {
                 UpdateWhiteCircleAbsolutePosition();
@@ -617,7 +638,6 @@ namespace TelescopeWatcher
                 return;
             }
 
-            // Only update if text actually changed to reduce flicker
             if (label.Text != newText)
             {
                 label.Text = newText;
@@ -632,6 +652,11 @@ namespace TelescopeWatcher
         private void VideoPlayerForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
             StopStreaming();
+            
+            commandTimer?.Stop();
+            commandTimer?.Dispose();
+            focusTimer?.Stop();
+            focusTimer?.Dispose();
         }
 
         private void StopStreaming()
@@ -665,6 +690,370 @@ namespace TelescopeWatcher
             System.Diagnostics.Debug.WriteLine($"Flip Vertical: {flipVertical}");
         }
 
+        #region Keyboard Control Methods
+
+        private void VideoPlayerForm_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (isKeyPressed || isFocusKeyPressed)
+            {
+                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
+                    e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+                return;
+            }
+
+            if (e.KeyCode == Keys.Up)
+            {
+                isKeyPressed = true;
+                currentDirection = "UP";
+                SendTelescopeCommand("UP");
+                commandTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                LogMessage("UP arrow key pressed");
+            }
+            else if (e.KeyCode == Keys.Down)
+            {
+                isKeyPressed = true;
+                currentDirection = "DOWN";
+                SendTelescopeCommand("DOWN");
+                commandTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                LogMessage("DOWN arrow key pressed");
+            }
+            else if (e.KeyCode == Keys.Left)
+            {
+                isKeyPressed = true;
+                currentDirection = "LEFT";
+                SendTelescopeCommand("LEFT");
+                commandTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                LogMessage("LEFT arrow key pressed");
+            }
+            else if (e.KeyCode == Keys.Right)
+            {
+                isKeyPressed = true;
+                currentDirection = "RIGHT";
+                SendTelescopeCommand("RIGHT");
+                commandTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                LogMessage("RIGHT arrow key pressed");
+            }
+            else if (e.KeyCode == Keys.PageUp)
+            {
+                isFocusKeyPressed = true;
+                currentFocusDirection = "INCREASE";
+                SendFocusCommand("INCREASE");
+                focusTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                LogMessage("PageUp key pressed - Focus increase");
+            }
+            else if (e.KeyCode == Keys.PageDown)
+            {
+                isFocusKeyPressed = true;
+                currentFocusDirection = "DECREASE";
+                SendFocusCommand("DECREASE");
+                focusTimer.Start();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                LogMessage("PageDown key pressed - Focus decrease");
+            }
+        }
+
+        private void VideoPlayerForm_KeyUp(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right)
+            {
+                isKeyPressed = false;
+                commandTimer.Stop();
+                SendStopCommand();
+                string keyName = e.KeyCode == Keys.Up ? "UP" :
+                                 e.KeyCode == Keys.Down ? "DOWN" :
+                                 e.KeyCode == Keys.Left ? "LEFT" : "RIGHT";
+                LogMessage($"{keyName} arrow key released - stopped sending commands");
+                currentDirection = "";
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
+            {
+                isFocusKeyPressed = false;
+                focusTimer.Stop();
+                SendFocusStopCommand();
+                string keyName = e.KeyCode == Keys.PageUp ? "PageUp" : "PageDown";
+                LogMessage($"{keyName} key released - stopped focus commands");
+                currentFocusDirection = "";
+                e.Handled = true;
+            }
+        }
+
+        private void CommandTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(currentDirection))
+            {
+                SendStepsCommand();
+            }
+        }
+
+        private void FocusTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(currentFocusDirection))
+            {
+                SendFocusStepsCommand();
+            }
+        }
+
+        private void SendTelescopeCommand(string direction)
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    LogMessage("Error: Server connection is not available!");
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    LogMessage("Error: Serial port is not open!");
+                    return;
+                }
+            }
+
+            try
+            {
+                string motorCommand;
+                string directionCommand;
+
+                if (direction == "UP")
+                {
+                    motorCommand = "v=0";
+                    directionCommand = "d=0";
+                    WriteCommand(motorCommand);
+                    Thread.Sleep(50);
+                }
+                else if (direction == "DOWN")
+                {
+                    motorCommand = "v=0";
+                    directionCommand = "d=1";
+                    WriteCommand(motorCommand);
+                    Thread.Sleep(50);
+                }
+                else if (direction == "LEFT")
+                {
+                    motorCommand = "v=1";
+                    directionCommand = "d=0";
+                    WriteCommand(motorCommand);
+                    Thread.Sleep(50);
+                }
+                else
+                {
+                    motorCommand = "v=1";
+                    directionCommand = "d=1";
+                    WriteCommand(motorCommand);
+                    Thread.Sleep(50);
+                }
+
+                WriteCommand(directionCommand);
+                Thread.Sleep(50);
+
+                string timeCommand = timeBetweenSteps == 0 ? "t=0.1" : $"t={timeBetweenSteps}";
+                WriteCommand(timeCommand);
+                Thread.Sleep(50);
+
+                string stepsCommand = "s=10000";
+                WriteCommand(stepsCommand);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error sending command: {ex.Message}");
+            }
+        }
+
+        private void SendStepsCommand()
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    commandTimer.Stop();
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    commandTimer.Stop();
+                    return;
+                }
+            }
+
+            try
+            {
+                string stepsCommand = "s=10000";
+                WriteCommand(stepsCommand);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error sending command: {ex.Message}");
+                commandTimer.Stop();
+            }
+        }
+
+        private void SendStopCommand()
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                string stopCommand = "s=0";
+                WriteCommand(stopCommand);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error sending stop command: {ex.Message}");
+            }
+        }
+
+        private void SendFocusCommand(string direction)
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    LogMessage("Error: Server connection is not available!");
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    LogMessage("Error: Serial port is not open!");
+                    return;
+                }
+            }
+
+            try
+            {
+                string speedCommand = $"b={focusSpeed}";
+                WriteCommand(speedCommand);
+                Thread.Sleep(50);
+
+                string directionCommand = direction == "INCREASE" ? "a=1" : "a=0";
+                WriteCommand(directionCommand);
+                Thread.Sleep(50);
+
+                string stepsCommand = "c=100";
+                WriteCommand(stepsCommand);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error sending focus command: {ex.Message}");
+            }
+        }
+
+        private void SendFocusStepsCommand()
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    focusTimer.Stop();
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    focusTimer.Stop();
+                    return;
+                }
+            }
+
+            try
+            {
+                string stepsCommand = "c=100";
+                WriteCommand(stepsCommand);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error sending focus steps command: {ex.Message}");
+                focusTimer.Stop();
+            }
+        }
+
+        private void SendFocusStopCommand()
+        {
+            if (isServerMode)
+            {
+                if (serverClient == null || !serverClient.IsConnected())
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (serialPort == null || !serialPort.IsOpen)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                string stopCommand = "c=0";
+                WriteCommand(stopCommand);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error sending focus stop command: {ex.Message}");
+            }
+        }
+
+        private void WriteCommand(string command)
+        {
+            if (isServerMode)
+            {
+                serverClient?.WriteLine(command);
+            }
+            else
+            {
+                serialPort?.WriteLine(command);
+            }
+        }
+
+        private void LogMessage(string message)
+        {
+            System.Diagnostics.Debug.WriteLine($"[VideoPlayerForm] {message}");
+            logCallback?.Invoke(message);
+        }
+
+        #endregion
+
         #region Circle Overlay Methods
 
         private void BtnAddCircle_Click(object? sender, EventArgs e)
@@ -676,7 +1065,6 @@ namespace TelescopeWatcher
                 btnAddCircle.Text = "Stop Adding";
                 btnAddCircle.BackColor = System.Drawing.Color.DarkGreen;
                 
-                // Wire up mouse events for pictureBox2
                 pictureBox2.MouseMove += PictureBox2_MouseMove;
                 pictureBox2.MouseClick += PictureBox2_MouseClick;
                 pictureBox2.Paint += PictureBox2_Paint;
@@ -684,10 +1072,9 @@ namespace TelescopeWatcher
             }
             else
             {
-                btnAddCircle.Text = "Add Red Circle";
+                btnAddCircle.Text = "Add Circle";
                 btnAddCircle.BackColor = System.Drawing.Color.DarkRed;
                 
-                // Unwire mouse events
                 pictureBox2.MouseMove -= PictureBox2_MouseMove;
                 pictureBox2.MouseClick -= PictureBox2_MouseClick;
                 pictureBox2.Invalidate();
@@ -724,20 +1111,16 @@ namespace TelescopeWatcher
         {
             if (isAddingCircle && e.Button == MouseButtons.Left)
             {
-                // Get the actual displayed image rectangle
                 Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
                 
                 if (displayRect.Width > 0 && displayRect.Height > 0)
                 {
-                    // Calculate position relative to the actual image area (not the PictureBox)
                     int imageX = e.Location.X - displayRect.X;
                     int imageY = e.Location.Y - displayRect.Y;
                     
-                    // Store as percentage of the actual image display area
                     float relativeX = (float)imageX / displayRect.Width;
                     float relativeY = (float)imageY / displayRect.Height;
                     
-                    // Clamp to 0-1 range (in case click is in letterbox area)
                     relativeX = Math.Max(0, Math.Min(1, relativeX));
                     relativeY = Math.Max(0, Math.Min(1, relativeY));
                     
@@ -754,7 +1137,6 @@ namespace TelescopeWatcher
 
         private void PictureBox2_Paint(object? sender, PaintEventArgs e)
         {
-            // Draw white circle (permanent marker) - use saved radius
             if (whiteCirclePosition.HasValue)
             {
                 using (Pen whitePen = new Pen(Color.White, 2))
@@ -765,7 +1147,6 @@ namespace TelescopeWatcher
                 }
             }
 
-            // Draw red circle (cursor preview)
             if (isAddingCircle)
             {
                 using (Pen redPen = new Pen(Color.Red, 2))
@@ -794,12 +1175,10 @@ namespace TelescopeWatcher
                         whiteCirclePositionRelative = new PointF(relativeX, relativeY);
                         whiteCircleRadius = radius;
                         
-                        // Calculate absolute position based on current PictureBox size
                         UpdateWhiteCircleAbsolutePosition();
                         
                         System.Diagnostics.Debug.WriteLine($"Loaded white circle relative position: ({relativeX:P1}, {relativeY:P1}) with radius: {whiteCircleRadius}");
                         
-                        // Force repaint to show the loaded circle
                         if (pictureBox2 != null)
                         {
                             pictureBox2.Invalidate();
@@ -822,7 +1201,7 @@ namespace TelescopeWatcher
                     string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "circle_position.txt");
                     File.WriteAllLines(configPath, new[]
                     {
-                        whiteCirclePositionRelative.Value.X.ToString("F6"),  // Save as decimal (0.0 to 1.0)
+                        whiteCirclePositionRelative.Value.X.ToString("F6"),
                         whiteCirclePositionRelative.Value.Y.ToString("F6"),
                         whiteCircleRadius.ToString()
                     });
@@ -839,7 +1218,6 @@ namespace TelescopeWatcher
         {
             if (whiteCirclePositionRelative.HasValue && pictureBox2 != null && pictureBox2.Image != null)
             {
-                // Get the actual displayed image rectangle within the PictureBox (accounts for Zoom mode)
                 Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
                 
                 if (displayRect.Width > 0 && displayRect.Height > 0)
@@ -857,9 +1235,6 @@ namespace TelescopeWatcher
             if (pictureBox.Image == null)
                 return Rectangle.Empty;
 
-            // Calculate the actual display rectangle of the image within the PictureBox
-            // when SizeMode is Zoom (maintains aspect ratio)
-            
             float imageAspect = (float)pictureBox.Image.Width / pictureBox.Image.Height;
             float containerAspect = (float)pictureBox.Width / pictureBox.Height;
 
@@ -867,7 +1242,6 @@ namespace TelescopeWatcher
 
             if (imageAspect > containerAspect)
             {
-                // Image is wider - fit to width, letterbox top/bottom
                 displayWidth = pictureBox.Width;
                 displayHeight = (int)(pictureBox.Width / imageAspect);
                 displayX = 0;
@@ -875,7 +1249,6 @@ namespace TelescopeWatcher
             }
             else
             {
-                // Image is taller - fit to height, letterbox left/right
                 displayHeight = pictureBox.Height;
                 displayWidth = (int)(pictureBox.Height * imageAspect);
                 displayX = (pictureBox.Width - displayWidth) / 2;
