@@ -154,7 +154,7 @@ namespace TelescopeWatcher
             // Circle control buttons
             btnAddCircle = new Button
             {
-                Text = "Add Red Circle",
+                Text = "Add Circle",
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkRed,
@@ -169,12 +169,13 @@ namespace TelescopeWatcher
             {
                 Text = "-",
                 Width = 30,
-                Height = 25,
+                Height = 28,
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(720, 5),
-                Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold)
+                Location = new System.Drawing.Point(720, 3),
+                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
             btnCircleSizeDecrease.Click += BtnCircleSizeDecrease_Click;
 
@@ -191,12 +192,13 @@ namespace TelescopeWatcher
             {
                 Text = "+",
                 Width = 30,
-                Height = 25,
+                Height = 28,
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(810, 5),
-                Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold)
+                Location = new System.Drawing.Point(810, 3),
+                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
             btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
 
