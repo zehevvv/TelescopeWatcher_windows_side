@@ -93,6 +93,13 @@ namespace TelescopeWatcher
                 Padding = new Padding(10, 5, 10, 5)
             };
 
+            // Calculate available width and divide by number of controls
+            int availableWidth = this.ClientSize.Width - 20; // Subtract left and right padding
+            int totalControls = 9; // 3 radio buttons + 2 checkboxes + 1 button + 3 circle controls
+            int controlWidth = availableWidth / totalControls;
+            int currentX = 10;
+            int yPosition = 8;
+
             // Stream selection radio buttons
             radioMainOnly = new RadioButton
             {
@@ -100,10 +107,12 @@ namespace TelescopeWatcher
                 Checked = false,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(10, 8),
+                Location = new System.Drawing.Point(currentX, yPosition),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             radioMainOnly.CheckedChanged += RadioStream_CheckedChanged;
+            controlPanel.Controls.Add(radioMainOnly);
+            currentX += controlWidth;
 
             radioSecondaryOnly = new RadioButton
             {
@@ -111,10 +120,12 @@ namespace TelescopeWatcher
                 Checked = false,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(130, 8),
+                Location = new System.Drawing.Point(currentX, yPosition),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             radioSecondaryOnly.CheckedChanged += RadioStream_CheckedChanged;
+            controlPanel.Controls.Add(radioSecondaryOnly);
+            currentX += controlWidth;
 
             radioBoth = new RadioButton
             {
@@ -122,10 +133,12 @@ namespace TelescopeWatcher
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(280, 8),
+                Location = new System.Drawing.Point(currentX, yPosition),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             radioBoth.CheckedChanged += RadioStream_CheckedChanged;
+            controlPanel.Controls.Add(radioBoth);
+            currentX += controlWidth;
 
             // Horizontal flip checkbox
             chkFlipHorizontal = new CheckBox
@@ -134,10 +147,12 @@ namespace TelescopeWatcher
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(420, 8),
+                Location = new System.Drawing.Point(currentX, yPosition),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             chkFlipHorizontal.CheckedChanged += ChkFlipHorizontal_CheckedChanged;
+            controlPanel.Controls.Add(chkFlipHorizontal);
+            currentX += controlWidth;
 
             // Vertical flip checkbox
             chkFlipVertical = new CheckBox
@@ -146,10 +161,12 @@ namespace TelescopeWatcher
                 Checked = true,
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(500, 8),
+                Location = new System.Drawing.Point(currentX, yPosition),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
             chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
+            controlPanel.Controls.Add(chkFlipVertical);
+            currentX += controlWidth;
 
             // Circle control buttons
             btnAddCircle = new Button
@@ -159,11 +176,13 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkRed,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(580, 5),
+                Location = new System.Drawing.Point(currentX, 5),
                 Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
                 Padding = new Padding(5, 2, 5, 2)
             };
             btnAddCircle.Click += BtnAddCircle_Click;
+            controlPanel.Controls.Add(btnAddCircle);
+            currentX += controlWidth;
 
             btnCircleSizeDecrease = new Button
             {
@@ -173,20 +192,24 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(720, 3),
+                Location = new System.Drawing.Point(currentX, 3),
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
             btnCircleSizeDecrease.Click += BtnCircleSizeDecrease_Click;
+            controlPanel.Controls.Add(btnCircleSizeDecrease);
+            currentX += controlWidth;
 
             lblCircleSize = new Label
             {
                 Text = $"{circleRadius}",
                 AutoSize = true,
                 ForeColor = System.Drawing.Color.White,
-                Location = new System.Drawing.Point(755, 8),
+                Location = new System.Drawing.Point(currentX, yPosition),
                 Font = new System.Drawing.Font("Segoe UI", 9F)
             };
+            controlPanel.Controls.Add(lblCircleSize);
+            currentX += controlWidth;
 
             btnCircleSizeIncrease = new Button
             {
@@ -196,20 +219,11 @@ namespace TelescopeWatcher
                 ForeColor = System.Drawing.Color.White,
                 BackColor = System.Drawing.Color.DarkSlateGray,
                 FlatStyle = FlatStyle.Flat,
-                Location = new System.Drawing.Point(810, 3),
+                Location = new System.Drawing.Point(currentX, 3),
                 Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold),
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
             btnCircleSizeIncrease.Click += BtnCircleSizeIncrease_Click;
-
-            controlPanel.Controls.Add(radioMainOnly);
-            controlPanel.Controls.Add(radioSecondaryOnly);
-            controlPanel.Controls.Add(radioBoth);
-            controlPanel.Controls.Add(chkFlipHorizontal);
-            controlPanel.Controls.Add(chkFlipVertical);
-            controlPanel.Controls.Add(btnAddCircle);
-            controlPanel.Controls.Add(btnCircleSizeDecrease);
-            controlPanel.Controls.Add(lblCircleSize);
             controlPanel.Controls.Add(btnCircleSizeIncrease);
 
             // Video panel container
@@ -294,6 +308,29 @@ namespace TelescopeWatcher
             // Recalculate circle position when window is resized
             UpdateWhiteCircleAbsolutePosition();
             pictureBox2.Invalidate();
+            
+            // Reposition control panel items dynamically
+            if (controlPanel != null && controlPanel.Controls.Count > 0)
+            {
+                int availableWidth = this.ClientSize.Width - 20;
+                int totalControls = 9;
+                int controlWidth = availableWidth / totalControls;
+                int currentX = 10;
+                int yPosition = 8;
+                
+                foreach (Control control in controlPanel.Controls)
+                {
+                    if (control is RadioButton || control is CheckBox || control is Label)
+                    {
+                        control.Location = new System.Drawing.Point(currentX, yPosition);
+                    }
+                    else if (control is Button)
+                    {
+                        control.Location = new System.Drawing.Point(currentX, 3);
+                    }
+                    currentX += controlWidth;
+                }
+            }
         }
 
         private void RadioStream_CheckedChanged(object? sender, EventArgs e)
