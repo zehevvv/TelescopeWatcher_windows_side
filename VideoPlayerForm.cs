@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Text;
 using System.IO.Ports;
+using System.Diagnostics;
 
 namespace TelescopeWatcher
 {
@@ -23,6 +24,8 @@ namespace TelescopeWatcher
         private Button btnCircleSizeIncrease;
         private Button btnCircleSizeDecrease;
         private Label lblCircleSize;
+        private Button btnMainCameraControl;
+        private Button btnSecondaryCameraControl;
         private readonly string mjpegUrl1;
         private readonly string mjpegUrl2;
         private HttpClient? httpClient1;
@@ -185,6 +188,35 @@ namespace TelescopeWatcher
             };
             chkFlipVertical.CheckedChanged += ChkFlipVertical_CheckedChanged;
 
+            // Camera control buttons
+            btnMainCameraControl = new Button
+            {
+                Text = "Main Cam Control",
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                BackColor = System.Drawing.Color.DarkBlue,
+                FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(580, 5),
+                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
+                Padding = new Padding(8, 2, 8, 2),
+                Margin = new Padding(0, 0, 10, 0)
+            };
+            btnMainCameraControl.Click += BtnMainCameraControl_Click;
+
+            btnSecondaryCameraControl = new Button
+            {
+                Text = "Sec Cam Control",
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                BackColor = System.Drawing.Color.DarkBlue,
+                FlatStyle = FlatStyle.Flat,
+                Location = new System.Drawing.Point(730, 5),
+                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold),
+                Padding = new Padding(8, 2, 8, 2),
+                Margin = new Padding(0, 0, 10, 0)
+            };
+            btnSecondaryCameraControl.Click += BtnSecondaryCameraControl_Click;
+
             // Circle controls - positioned from the right using Anchor
             btnCircleSizeIncrease = new Button
             {
@@ -244,6 +276,8 @@ namespace TelescopeWatcher
             controlPanel.Controls.Add(radioBoth);
             controlPanel.Controls.Add(chkFlipHorizontal);
             controlPanel.Controls.Add(chkFlipVertical);
+            controlPanel.Controls.Add(btnMainCameraControl);
+            controlPanel.Controls.Add(btnSecondaryCameraControl);
             controlPanel.Controls.Add(btnAddCircle);
             controlPanel.Controls.Add(btnCircleSizeDecrease);
             controlPanel.Controls.Add(lblCircleSize);
@@ -1281,6 +1315,50 @@ namespace TelescopeWatcher
             }
 
             return new Rectangle(displayX, displayY, displayWidth, displayHeight);
+        }
+
+        #endregion
+
+        #region Camera Control Methods
+
+        private void BtnMainCameraControl_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                string url = "http://192.168.4.1:8080/control.htm";
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+                LogMessage($"Opening Main Camera control page: {url}");
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error opening Main Camera control page: {ex.Message}");
+                MessageBox.Show($"Failed to open camera control page:\n\n{ex.Message}",
+                    "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnSecondaryCameraControl_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                string url = "http://192.168.4.1:8081/control.htm";
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+                LogMessage($"Opening Secondary Camera control page: {url}");
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error opening Secondary Camera control page: {ex.Message}");
+                MessageBox.Show($"Failed to open camera control page:\n\n{ex.Message}",
+                    "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         #endregion
