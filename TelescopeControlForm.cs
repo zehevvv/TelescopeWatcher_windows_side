@@ -16,15 +16,15 @@ namespace TelescopeWatcher
         private string currentFocusDirection = "";
         private bool isKeyPressed = false;
         private bool isFocusKeyPressed = false;
-        private int timeBetweenSteps = 10; // Default 10ms (100 steps/second)
-        private int focusSpeed = 9; // Default focus motor speed (1-18)
+        private int timeBetweenSteps = 10;
+        private int focusSpeed = 9;
         private bool isServerMode = false;
         private string? videoServerUrl;
         private HttpClient? videoHttpClient;
         private VideoPlayerForm? videoPlayerForm;
 
         // Steps per second values corresponding to trackbar positions
-        private readonly int[] stepsPerSecondValues = { 3, 1, 10, 100, 1000, 10000 };
+        private readonly int[] stepsPerSecondValues = { 3, 10, 100, 1000, 10000 };
 
         public TelescopeControlForm(SerialPort? port, string? serverUrl, string portName)
         {
@@ -63,13 +63,22 @@ namespace TelescopeWatcher
 
             // Initialize timer for continuous commands
             commandTimer = new System.Windows.Forms.Timer();
-            commandTimer.Interval = 200; // 200ms interval
+            commandTimer.Interval = 200;
             commandTimer.Tick += CommandTimer_Tick;
 
             // Initialize focus timer for continuous focus commands
             focusTimer = new System.Windows.Forms.Timer();
-            focusTimer.Interval = 100; // 100ms interval
+            focusTimer.Interval = 100;
             focusTimer.Tick += FocusTimer_Tick;
+            
+            // Initialize shared settings
+            var settings = TelescopeSettings.Instance;
+            this.focusSpeed = settings.FocusSpeed;
+            this.timeBetweenSteps = settings.TimeBetweenSteps;
+            
+            // Subscribe to settings changes
+            settings.StepsPerSecondChanged += OnStepsPerSecondChanged;
+            settings.FocusSpeedChanged += OnFocusSpeedChanged;
 
             if (isServerMode)
             {
@@ -77,7 +86,7 @@ namespace TelescopeWatcher
 
                 // Start video status polling
                 videoStatusTimer = new System.Windows.Forms.Timer();
-                videoStatusTimer.Interval = 3000; // 3 seconds
+                videoStatusTimer.Interval = 3000;
                 videoStatusTimer.Tick += VideoStatusTimer_Tick;
                 videoStatusTimer.Start();
 
@@ -109,6 +118,44 @@ namespace TelescopeWatcher
 
             // Set default trackbar value and update display
             UpdateStepsPerSecondDisplay();
+            UpdateFocusSpeedDisplay();
+        }
+
+        private void OnStepsPerSecondChanged(object? sender, EventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => OnStepsPerSecondChanged(sender, e)));
+                return;
+            }
+            
+            var settings = TelescopeSettings.Instance;
+            this.timeBetweenSteps = settings.TimeBetweenSteps;
+            
+            // Update trackbar without triggering event
+            trackBarStepsPerSecond.Scroll -= trackBarStepsPerSecond_Scroll;
+            trackBarStepsPerSecond.Value = settings.GetTrackbarIndexForStepsPerSecond();
+            trackBarStepsPerSecond.Scroll += trackBarStepsPerSecond_Scroll;
+            
+            UpdateStepsPerSecondDisplay();
+        }
+
+        private void OnFocusSpeedChanged(object? sender, EventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => OnFocusSpeedChanged(sender, e)));
+                return;
+            }
+            
+            var settings = TelescopeSettings.Instance;
+            this.focusSpeed = settings.FocusSpeed;
+            
+            // Update trackbar without triggering event
+            trackBarFocusSpeed.Scroll -= trackBarFocusSpeed_Scroll;
+            trackBarFocusSpeed.Value = settings.FocusSpeed;
+            trackBarFocusSpeed.Scroll += trackBarFocusSpeed_Scroll;
+            
             UpdateFocusSpeedDisplay();
         }
 
@@ -189,9 +236,9 @@ namespace TelescopeWatcher
                         {
                             string baseUrl = $"{uri.Scheme}://{uri.Host}";
 
-                            // Get current steps per second from trackbar
-                            int trackBarValue = trackBarStepsPerSecond.Value;
-                            int stepsPerSecond = stepsPerSecondValues[trackBarValue];
+                            // Get current steps per second from shared settings
+                            var settings = TelescopeSettings.Instance;
+                            int stepsPerSecond = settings.StepsPerSecond;
 
                             // Pass telescope control dependencies to video player
                             videoPlayerForm = new VideoPlayerForm(
@@ -199,7 +246,7 @@ namespace TelescopeWatcher
                                 serialPort, 
                                 serverClient, 
                                 stepsPerSecond, 
-                                focusSpeed,
+                                settings.FocusSpeed,
                                 AddLogMessage
                             );
                             videoPlayerForm.Show();
@@ -264,9 +311,9 @@ namespace TelescopeWatcher
                             {
                                 string baseUrl = $"{uri.Scheme}://{uri.Host}";
                                 
-                                // Get current steps per second from trackbar
-                                int trackBarValue = trackBarStepsPerSecond.Value;
-                                int stepsPerSecond = stepsPerSecondValues[trackBarValue];
+                                // Get current steps per second from shared settings
+                                var settings = TelescopeSettings.Instance;
+                                int stepsPerSecond = settings.StepsPerSecond;
                                 
                                 // Pass telescope control dependencies to video player
                                 videoPlayerForm = new VideoPlayerForm(
@@ -274,7 +321,7 @@ namespace TelescopeWatcher
                                     serialPort, 
                                     serverClient, 
                                     stepsPerSecond, 
-                                    focusSpeed,
+                                    settings.FocusSpeed,
                                     AddLogMessage
                                 );
                                 videoPlayerForm.Show();
@@ -416,35 +463,29 @@ namespace TelescopeWatcher
 
         private void trackBarStepsPerSecond_Scroll(object? sender, EventArgs e)
         {
+            var settings = TelescopeSettings.Instance;
+            settings.SetStepsPerSecondFromTrackbarIndex(trackBarStepsPerSecond.Value);
             UpdateStepsPerSecondDisplay();
         }
 
         private void trackBarFocusSpeed_Scroll(object? sender, EventArgs e)
         {
+            var settings = TelescopeSettings.Instance;
+            settings.FocusSpeed = trackBarFocusSpeed.Value;
             UpdateFocusSpeedDisplay();
         }
 
         private void UpdateFocusSpeedDisplay()
         {
-            focusSpeed = trackBarFocusSpeed.Value;
-            lblFocusSpeedValue.Text = $"Speed: {focusSpeed}";
-            AddLogMessage($"Focus motor speed set to {focusSpeed}");
+            var settings = TelescopeSettings.Instance;
+            lblFocusSpeedValue.Text = $"Speed: {settings.FocusSpeed}";
+            AddLogMessage($"Focus motor speed set to {settings.FocusSpeed}");
         }
 
         private void UpdateStepsPerSecondDisplay()
         {
-            int trackBarValue = trackBarStepsPerSecond.Value;
-            int stepsPerSecond = stepsPerSecondValues[trackBarValue];
-
-            // Calculate time between steps in milliseconds
-            double timeMs = 1000.0 / stepsPerSecond;
-            timeBetweenSteps = (int)Math.Round(timeMs);
-
-            // Ensure minimum time is at least 0.1ms for very high speeds
-            if (stepsPerSecond == 10000)
-            {
-                timeBetweenSteps = 0; // Will send as t=0.1 in the command
-            }
+            var settings = TelescopeSettings.Instance;
+            int stepsPerSecond = settings.StepsPerSecond;
 
             // Update display labels
             lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/second";
@@ -455,10 +496,11 @@ namespace TelescopeWatcher
             }
             else
             {
+                double timeMs = 1000.0 / stepsPerSecond;
                 lblTimeValue.Text = $"(t={timeMs:F1} ms)";
             }
 
-            AddLogMessage($"Speed set to {stepsPerSecond} steps/second (t={(stepsPerSecond == 10000 ? "0.1" : timeMs.ToString("F1"))} ms)");
+            AddLogMessage($"Speed set to {stepsPerSecond} steps/second (t={(stepsPerSecond == 10000 ? "0.1" : (1000.0 / stepsPerSecond).ToString("F1"))} ms)");
         }
 
         private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)

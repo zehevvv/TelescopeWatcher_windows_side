@@ -26,6 +26,16 @@ namespace TelescopeWatcher
         private Label lblCircleSize;
         private Button btnMainCameraControl;
         private Button btnSecondaryCameraControl;
+        
+        // Telescope control sliders
+        private Panel telescopeControlPanel;
+        private TrackBar trackBarStepsPerSecond;
+        private Label lblStepsPerSecond;
+        private Label lblStepsPerSecondValue;
+        private TrackBar trackBarFocusSpeed;
+        private Label lblFocusSpeed;
+        private Label lblFocusSpeedValue;
+        
         private readonly string mjpegUrl1;
         private readonly string mjpegUrl2;
         private HttpClient? httpClient1;
@@ -76,15 +86,18 @@ namespace TelescopeWatcher
             this.serialPort = port;
             this.serverClient = client;
             this.isServerMode = (client != null);
-            this.focusSpeed = focusMotorSpeed;
             this.logCallback = logCallback;
             
-            double timeMs = 1000.0 / stepsPerSecond;
-            this.timeBetweenSteps = (int)Math.Round(timeMs);
-            if (stepsPerSecond == 10000)
-            {
-                this.timeBetweenSteps = 0;
-            }
+            // Use shared settings
+            var settings = TelescopeSettings.Instance;
+            settings.StepsPerSecond = stepsPerSecond;
+            settings.FocusSpeed = focusMotorSpeed;
+            this.focusSpeed = settings.FocusSpeed;
+            this.timeBetweenSteps = settings.TimeBetweenSteps;
+            
+            // Subscribe to settings changes
+            settings.StepsPerSecondChanged += OnStepsPerSecondChanged;
+            settings.FocusSpeedChanged += OnFocusSpeedChanged;
             
             InitializeComponent();
             this.FormClosing += VideoPlayerForm_FormClosing;
@@ -99,13 +112,51 @@ namespace TelescopeWatcher
             focusTimer.Tick += FocusTimer_Tick;
         }
 
+        private void OnStepsPerSecondChanged(object? sender, EventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => OnStepsPerSecondChanged(sender, e)));
+                return;
+            }
+            
+            var settings = TelescopeSettings.Instance;
+            this.timeBetweenSteps = settings.TimeBetweenSteps;
+            
+            // Update trackbar without triggering event
+            trackBarStepsPerSecond.ValueChanged -= TrackBarStepsPerSecond_ValueChanged;
+            trackBarStepsPerSecond.Value = settings.GetTrackbarIndexForStepsPerSecond();
+            trackBarStepsPerSecond.ValueChanged += TrackBarStepsPerSecond_ValueChanged;
+            
+            UpdateStepsPerSecondDisplay();
+        }
+
+        private void OnFocusSpeedChanged(object? sender, EventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => OnFocusSpeedChanged(sender, e)));
+                return;
+            }
+            
+            var settings = TelescopeSettings.Instance;
+            this.focusSpeed = settings.FocusSpeed;
+            
+            // Update trackbar without triggering event
+            trackBarFocusSpeed.ValueChanged -= TrackBarFocusSpeed_ValueChanged;
+            trackBarFocusSpeed.Value = settings.FocusSpeed;
+            trackBarFocusSpeed.ValueChanged += TrackBarFocusSpeed_ValueChanged;
+            
+            UpdateFocusSpeedDisplay();
+        }
+
         private void InitializeComponent()
         {
             this.Text = "Video Stream - MJPEG";
-            this.Size = new System.Drawing.Size(1200, 600);
+            this.Size = new System.Drawing.Size(1200, 680);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable;
-            this.MinimumSize = new System.Drawing.Size(600, 400);
+            this.MinimumSize = new System.Drawing.Size(600, 500);
             
             this.KeyPreview = true;
             
@@ -336,6 +387,87 @@ namespace TelescopeWatcher
             videoPanel.Controls.Add(pictureBox1);
             videoPanel.Controls.Add(pictureBox2);
 
+            // Telescope control panel
+            telescopeControlPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 80,
+                BackColor = System.Drawing.Color.FromArgb(45, 45, 48),
+                Padding = new Padding(10, 5, 10, 5)
+            };
+
+            // Steps per second trackbar
+            lblStepsPerSecond = new Label
+            {
+                Text = "Steps/Second:",
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Location = new System.Drawing.Point(10, 10),
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+
+            trackBarStepsPerSecond = new TrackBar
+            {
+                Minimum = 0,
+                Maximum = 4,
+                Value = TelescopeSettings.Instance.GetTrackbarIndexForStepsPerSecond(),
+                TickFrequency = 1,
+                LargeChange = 1,
+                SmallChange = 1,
+                Width = 300,
+                Location = new System.Drawing.Point(10, 30)
+            };
+            trackBarStepsPerSecond.ValueChanged += TrackBarStepsPerSecond_ValueChanged;
+
+            lblStepsPerSecondValue = new Label
+            {
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.LightGreen,
+                Location = new System.Drawing.Point(320, 35),
+                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
+            };
+
+            // Focus speed trackbar - positioned on the right side with anchoring
+            lblFocusSpeed = new Label
+            {
+                Text = "Focus Motor Speed:",
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.White,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Font = new System.Drawing.Font("Segoe UI", 9F)
+            };
+
+            trackBarFocusSpeed = new TrackBar
+            {
+                Minimum = 1,
+                Maximum = 18,
+                Value = TelescopeSettings.Instance.FocusSpeed,
+                TickFrequency = 1,
+                LargeChange = 2,
+                SmallChange = 1,
+                Width = 250,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            trackBarFocusSpeed.ValueChanged += TrackBarFocusSpeed_ValueChanged;
+
+            lblFocusSpeedValue = new Label
+            {
+                AutoSize = true,
+                ForeColor = System.Drawing.Color.LightGreen,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold)
+            };
+
+            telescopeControlPanel.Controls.Add(lblStepsPerSecond);
+            telescopeControlPanel.Controls.Add(trackBarStepsPerSecond);
+            telescopeControlPanel.Controls.Add(lblStepsPerSecondValue);
+            telescopeControlPanel.Controls.Add(lblFocusSpeed);
+            telescopeControlPanel.Controls.Add(trackBarFocusSpeed);
+            telescopeControlPanel.Controls.Add(lblFocusSpeedValue);
+            
+            // Position focus controls after panel is added
+            telescopeControlPanel.Resize += (s, e) => PositionFocusControls();
+            
             btnClose = new Button
             {
                 Text = "Close Stream",
@@ -353,12 +485,48 @@ namespace TelescopeWatcher
             this.Controls.Add(lblStatus);
             this.Controls.Add(lblFrameInfo1);
             this.Controls.Add(lblFrameInfo2);
+            this.Controls.Add(telescopeControlPanel);
             this.Controls.Add(btnClose);
 
             this.Load += VideoPlayerForm_Load;
             this.Resize += VideoPlayerForm_Resize;
             this.KeyDown += VideoPlayerForm_KeyDown;
             this.KeyUp += VideoPlayerForm_KeyUp;
+            
+            // Initialize displays
+            UpdateStepsPerSecondDisplay();
+            UpdateFocusSpeedDisplay();
+            
+            // Position focus controls initially
+            PositionFocusControls();
+        }
+
+        private void TrackBarStepsPerSecond_ValueChanged(object? sender, EventArgs e)
+        {
+            var settings = TelescopeSettings.Instance;
+            settings.SetStepsPerSecondFromTrackbarIndex(trackBarStepsPerSecond.Value);
+            UpdateStepsPerSecondDisplay();
+        }
+
+        private void TrackBarFocusSpeed_ValueChanged(object? sender, EventArgs e)
+        {
+            var settings = TelescopeSettings.Instance;
+            settings.FocusSpeed = trackBarFocusSpeed.Value;
+            UpdateFocusSpeedDisplay();
+        }
+
+        private void UpdateStepsPerSecondDisplay()
+        {
+            var settings = TelescopeSettings.Instance;
+            int stepsPerSecond = settings.StepsPerSecond;
+            double timeMs = stepsPerSecond == 10000 ? 0.1 : 1000.0 / stepsPerSecond;
+            lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/sec (t={timeMs:F1}ms)";
+        }
+
+        private void UpdateFocusSpeedDisplay()
+        {
+            var settings = TelescopeSettings.Instance;
+            lblFocusSpeedValue.Text = $"Speed: {settings.FocusSpeed}";
         }
 
         private void PositionCircleControls()
@@ -376,6 +544,34 @@ namespace TelescopeWatcher
             btnCircleSizeDecrease.Location = new System.Drawing.Point(lblCircleSize.Left - 5 - btnCircleSizeDecrease.Width, yPos);
             
             btnAddCircle.Location = new System.Drawing.Point(btnCircleSizeDecrease.Left - 10 - btnAddCircle.Width, yPos + 2);
+        }
+
+        private void PositionFocusControls()
+        {
+            if (telescopeControlPanel == null) return;
+            
+            int rightMargin = 10;
+            int labelYPos = 10;
+            int trackbarYPos = 30;
+            int valueYPos = 35;
+            
+            // Position focus speed value label from the right
+            lblFocusSpeedValue.Location = new System.Drawing.Point(
+                telescopeControlPanel.Width - rightMargin - lblFocusSpeedValue.PreferredWidth, 
+                valueYPos
+            );
+            
+            // Position trackbar to the left of the value label
+            trackBarFocusSpeed.Location = new System.Drawing.Point(
+                lblFocusSpeedValue.Left - 10 - trackBarFocusSpeed.Width, 
+                trackbarYPos
+            );
+            
+            // Position the label above the trackbar
+            lblFocusSpeed.Location = new System.Drawing.Point(
+                trackBarFocusSpeed.Left, 
+                labelYPos
+            );
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -511,7 +707,6 @@ namespace TelescopeWatcher
                         {
                             int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken.Token);
                             
-
 
                             if (bytesRead == 0)
                             {
