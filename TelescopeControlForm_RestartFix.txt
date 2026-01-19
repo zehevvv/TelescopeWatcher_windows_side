@@ -1,0 +1,63 @@
+// Replace the btnRestart_Click method in TelescopeControlForm.cs (around line 416) with this version:
+
+        private async void btnRestart_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                AddLogMessage("Error: Video server URL not available");
+                return;
+            }
+
+            try
+            {
+                btnRestart.Enabled = false;
+                AddLogMessage("Sending restart command to server...");
+
+                // Extract base URL for restart endpoint
+                var uri = new Uri(videoServerUrl);
+                string restartUrl = $"{uri.Scheme}://{uri.Host}:5000/restart";
+
+                // Create HttpClient with very short timeout since server will immediately shutdown
+                using (var restartClient = new HttpClient())
+                {
+                    restartClient.Timeout = TimeSpan.FromMilliseconds(500);
+
+                    try
+                    {
+                        // Send restart command - we expect this to fail/timeout because server shuts down immediately
+                        var response = await restartClient.GetAsync(restartUrl);
+                        
+                        // If we get here, the command was sent
+                        AddLogMessage("Restart command sent successfully");
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        // This is expected - server shuts down immediately after receiving restart command
+                        AddLogMessage("Restart command sent - server is restarting");
+                    }
+                    catch (HttpRequestException)
+                    {
+                        // This is also expected - connection closed by server during restart
+                        AddLogMessage("Restart command sent - server is restarting");
+                    }
+                    catch (Exception ex)
+                    {
+                        // Handle any other exceptions that may occur
+                        AddLogMessage($"Unexpected error while sending restart command: {ex.Message}");
+                    }
+                }
+
+                MessageBox.Show("Restart command sent to server.\n\nThe server will restart shortly.",
+                    "Restart", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error sending restart command: {ex.Message}");
+                MessageBox.Show($"Error sending restart command:\n\n{ex.Message}",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnRestart.Enabled = true;
+            }
+        }

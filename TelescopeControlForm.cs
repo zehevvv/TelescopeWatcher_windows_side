@@ -436,6 +436,58 @@ namespace TelescopeWatcher
             }
         }
 
+        private async void btnRestart_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(videoServerUrl) || videoHttpClient == null)
+            {
+                AddLogMessage("Error: Video server URL not available");
+                return;
+            }
+
+            try
+            {
+                btnRestart.Enabled = false;
+                AddLogMessage("Sending restart command to server...");
+
+                // Extract base URL for restart endpoint
+                var uri = new Uri(videoServerUrl);
+                string restartUrl = $"{uri.Scheme}://{uri.Host}:5000/restart";
+
+                // Send restart command
+                var response = await videoHttpClient.GetAsync(restartUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    AddLogMessage("Restart command sent successfully");
+                    MessageBox.Show("Restart command sent to server.\n\nThe server will restart shortly.",
+                        "Restart", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    string error = await response.Content.ReadAsStringAsync();
+                    AddLogMessage($"Failed to send restart command: {error}");
+                    MessageBox.Show($"Failed to send restart command.\n\n{error}",
+                        "Restart Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                AddLogMessage("Restart request timed out");
+                MessageBox.Show("Restart request timed out.\n\nThe server may be busy or unreachable.",
+                    "Timeout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Error sending restart command: {ex.Message}");
+                MessageBox.Show($"Error sending restart command:\n\n{ex.Message}",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnRestart.Enabled = true;
+            }
+        }
+
         #endregion
 
         #region Server Data Streaming
