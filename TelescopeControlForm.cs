@@ -1111,6 +1111,12 @@ namespace TelescopeWatcher
 
         private void TelescopeControlForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            // Unsubscribe from static events to prevent memory leaks and disposed access errors
+            var settings = TelescopeSettings.Instance;
+            settings.StepsPerSecondChanged -= OnStepsPerSecondChanged;
+            settings.FocusSpeedChanged -= OnFocusSpeedChanged;
+
+
             commandTimer?.Stop();
             commandTimer?.Dispose();
             focusTimer?.Stop();

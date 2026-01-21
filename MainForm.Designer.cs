@@ -40,6 +40,8 @@ namespace TelescopeWatcher
             this.lblServerUrl = new System.Windows.Forms.Label();
             this.radioServer = new System.Windows.Forms.RadioButton();
             this.radioSerial = new System.Windows.Forms.RadioButton();
+            this.lblWifiStatus = new System.Windows.Forms.Label();
+            this.btnConnectWifi = new System.Windows.Forms.Button();
             this.grpConnectionMode.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -82,6 +84,34 @@ namespace TelescopeWatcher
             this.btnDisconnect.Text = "Disconnect";
             this.btnDisconnect.UseVisualStyleBackColor = true;
             this.btnDisconnect.Click += new System.EventHandler(this.btnDisconnect_Click);
+            // 
+            // lblWifiStatus
+            // 
+            this.lblWifiStatus.AutoSize = true;
+            this.lblWifiStatus.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.lblWifiStatus.ForeColor = System.Drawing.Color.Gray;
+            this.lblWifiStatus.Location = new System.Drawing.Point(230, 269);
+            this.lblWifiStatus.Name = "lblWifiStatus";
+            this.lblWifiStatus.Size = new System.Drawing.Size(100, 15);
+            this.lblWifiStatus.TabIndex = 8;
+            this.lblWifiStatus.Text = "Checking Wi-Fi...";
+            this.lblWifiStatus.TextAlign = System.Drawing.ContentAlignment.TopRight;
+            // 
+            // btnConnectWifi
+            // 
+            this.btnConnectWifi.BackColor = System.Drawing.Color.LightCyan;
+            this.btnConnectWifi.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnConnectWifi.FlatAppearance.BorderColor = System.Drawing.Color.MediumTurquoise;
+            this.btnConnectWifi.FlatAppearance.BorderSize = 1;
+            this.btnConnectWifi.Font = new System.Drawing.Font("Segoe UI", 8F);
+            this.btnConnectWifi.Location = new System.Drawing.Point(230, 287);
+            this.btnConnectWifi.Name = "btnConnectWifi";
+            this.btnConnectWifi.Size = new System.Drawing.Size(100, 22);
+            this.btnConnectWifi.TabIndex = 9;
+            this.btnConnectWifi.Text = "Connect to Pi";
+            this.btnConnectWifi.UseVisualStyleBackColor = false;
+            this.btnConnectWifi.Visible = false;
+            this.btnConnectWifi.Click += new System.EventHandler(this.btnConnectWifi_Click);
             // 
             // txtStatus
             // 
@@ -171,6 +201,8 @@ namespace TelescopeWatcher
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(344, 481);
+            this.Controls.Add(this.btnConnectWifi);
+            this.Controls.Add(this.lblWifiStatus);
             this.Controls.Add(this.grpConnectionMode);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.lblPorts);
@@ -206,5 +238,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.RadioButton radioSerial;
         private System.Windows.Forms.TextBox txtServerUrl;
         private System.Windows.Forms.Label lblServerUrl;
+        private System.Windows.Forms.Label lblWifiStatus;
+        private System.Windows.Forms.Button btnConnectWifi;
     }
 }

@@ -1,4 +1,5 @@
 using System.IO.Ports;
+using System.Threading.Tasks;
 
 namespace TelescopeWatcher
 {
@@ -9,17 +10,21 @@ namespace TelescopeWatcher
         private TelescopeControlForm? telescopeControlForm;
         private bool isServerMode = true; // Default to server mode
         private string serverUrl = "http://192.168.4.1:5002";
+        private const string PI_SSID = "RaspberryPiCam";
 
         public MainForm()
         {
             InitializeComponent();
         }
 
-        private void MainForm_Load(object sender, EventArgs e)
+        private async void MainForm_Load(object sender, EventArgs e)
         {
             RefreshPortList();
             UpdateUIForConnectionMode();
             AddStatusMessage("Application started. Default mode: HTTP Server (192.168.4.1:5002)");
+
+             // Check Wifi connection
+            await CheckWifiConnectionAsync();
         }
 
         private void radioSerial_CheckedChanged(object sender, EventArgs e)
@@ -297,6 +302,82 @@ namespace TelescopeWatcher
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             DisconnectFromPort();
+        }
+
+        private async Task CheckWifiConnectionAsync()
+        {
+            try
+            {
+                lblWifiStatus.Text = "Checking Wi-Fi...";
+                string? currentSsid = await WifiHelper.GetCurrentSSIDAsync();
+
+                if (string.IsNullOrEmpty(currentSsid))
+                {
+                    lblWifiStatus.Text = "Wi-Fi: Not Connected";
+                    lblWifiStatus.ForeColor = Color.Red;
+                    btnConnectWifi.Visible = true;
+                }
+                else if (currentSsid == PI_SSID)
+                {
+                    lblWifiStatus.Text = $"Wi-Fi: {currentSsid}";
+                    lblWifiStatus.ForeColor = Color.Green;
+                    btnConnectWifi.Visible = false;
+                }
+                else
+                {
+                    lblWifiStatus.Text = $"Wi-Fi: {currentSsid}";
+                    lblWifiStatus.ForeColor = Color.Orange;
+                    btnConnectWifi.Visible = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                lblWifiStatus.Text = "Wi-Fi: Error";
+                lblWifiStatus.ForeColor = Color.Red;
+                AddStatusMessage($"Wi-Fi Error: {ex.Message}");
+            }
+        }
+
+        private async void btnConnectWifi_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                btnConnectWifi.Enabled = false;
+                btnConnectWifi.Text = "Connecting...";
+                AddStatusMessage($"Attempting to connect to Wi-Fi: {PI_SSID}...");
+
+                bool success = await WifiHelper.ConnectToWifiAsync(PI_SSID);
+
+                if (success)
+                {
+                    AddStatusMessage("Wi-Fi connection command sent successfully. Waiting for connection...");
+                    // Wait a bit for connection to establish
+                    await Task.Delay(5000);
+                    await CheckWifiConnectionAsync();
+                }
+                else
+                {
+                    AddStatusMessage("Failed to initiate Wi-Fi connection. Profile might be missing.");
+                    MessageBox.Show(
+                        $"Could not connect to '{PI_SSID}'.\n\nPlease ensure you have connected to this network manually at least once so the profile exists in Windows.",
+                        "Direct Wi-Fi Connection",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    
+                    await CheckWifiConnectionAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                AddStatusMessage($"Error connecting to Wi-Fi: {ex.Message}");
+                MessageBox.Show($"Error: {ex.Message}", "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                await CheckWifiConnectionAsync();
+            }
+            finally
+            {
+                btnConnectWifi.Enabled = true;
+                btnConnectWifi.Text = "Connect to Pi";
+            }
         }
     }
 }
