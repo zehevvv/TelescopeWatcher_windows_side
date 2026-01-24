@@ -944,38 +944,39 @@ namespace TelescopeWatcher
                 string directionCommand;
 
                 // Determine motor selection and direction based on command
+                // SWAPPED MOTORS: UP/DOWN now uses v=1, LEFT/RIGHT uses v=0
                 if (direction == "UP")
                 {
-                    motorCommand = "v=0"; // Up/Down motor
-                    directionCommand = "d=0";
-                    AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
+                    motorCommand = "v=1"; // Swapped used to be v=0
+                    directionCommand = "d=1";
+                    AddLogMessage("Sending: v=1 (Motor: UP/DOWN)");
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=1 (Direction: UP)");
                 }
                 else if (direction == "DOWN")
                 {
-                    motorCommand = "v=0"; // Up/Down motor
-                    directionCommand = "d=1";
-                    AddLogMessage("Sending: v=0 (Motor: UP/DOWN)");
+                    motorCommand = "v=1"; // Swapped used to be v=0
+                    directionCommand = "d=0";
+                    AddLogMessage("Sending: v=1 (Motor: UP/DOWN)");
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=0 (Direction: DOWN)");
                 }
                 else if (direction == "LEFT")
                 {
-                    motorCommand = "v=1"; // Left/Right motor
+                    motorCommand = "v=0"; // Swapped used to be v=1
                     directionCommand = "d=0";
-                    AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
+                    AddLogMessage("Sending: v=0 (Motor: LEFT/RIGHT)");
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=0 (Direction: LEFT)");
                 }
                 else // RIGHT
                 {
-                    motorCommand = "v=1"; // Left/Right motor
+                    motorCommand = "v=0"; // Swapped used to be v=1
                     directionCommand = "d=1";
-                    AddLogMessage("Sending: v=1 (Motor: LEFT/RIGHT)");
+                    AddLogMessage("Sending: v=0 (Motor: LEFT/RIGHT)");
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
                     AddLogMessage("Sending: d=1 (Direction: RIGHT)");
