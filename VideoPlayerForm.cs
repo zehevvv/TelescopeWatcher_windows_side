@@ -644,6 +644,11 @@ namespace TelescopeWatcher
                 // Note: LibVLC VideoView might fight for layout space if not careful.
                 // Dock Right for pictureBox2 gets priority, Fill fills remaining.
                 pictureBox2.Width = this.ClientSize.Width / 2;
+                
+                // Ensure pictureBox2 is docked first (Right) by sending it to back of Z-order
+                pictureBox2.SendToBack();
+                videoView1.BringToFront();
+
                 lblFrameInfo1.Visible = true;
                 lblFrameInfo2.Visible = true;
             }
@@ -667,20 +672,34 @@ namespace TelescopeWatcher
                 // Initialize LibVLC for Main Stream
                 try 
                 {
-                    libVLC = new LibVLC();
+                    // Enable detailed logging and TCP transport for RTSP stability
+                    libVLC = new LibVLC("--verbose=2");
+                    libVLC.Log += (sender, e) => System.Diagnostics.Debug.WriteLine($"[LibVLC] {e.FormattedLog}");
+
                     var host = new Uri(serverBaseUrl).Host;
                     var rtspUrl = $"rtsp://{host}:8554/cam";
                     
                     System.Diagnostics.Debug.WriteLine($"Connecting to Main RTSP: {rtspUrl}");
 
                     mediaPlayer1 = new MediaPlayer(libVLC);
+                    
+                    // Add event handlers for status tracking
+                    mediaPlayer1.EncounteredError += (s, args) => 
+                    {
+                        System.Diagnostics.Debug.WriteLine("[LibVLC] Error encountered");
+                        UpdateStatus("Main Stream Error", System.Drawing.Color.Red);
+                    };
+                    mediaPlayer1.Opening += (s, args) => System.Diagnostics.Debug.WriteLine("[LibVLC] Opening media");
+                    mediaPlayer1.Buffering += (s, args) => System.Diagnostics.Debug.WriteLine($"[LibVLC] Buffering: {args.Cache}%");
+                    
                     videoView1.MediaPlayer = mediaPlayer1;
 
                     var media = new Media(libVLC, rtspUrl, FromType.FromLocation);
                     // Low latency options
-                    media.AddOption(":network-caching=150");
+                    media.AddOption(":network-caching=300"); // Increased buffer for stability
                     media.AddOption(":clock-jitter=0");
                     media.AddOption(":clock-synchro=0");
+                    media.AddOption(":rtsp-tcp"); // Force TCP transport
                     
                     if (flipHorizontal && flipVertical) media.AddOption(":video-filter=transform{type=180}");
                     else if (flipHorizontal) media.AddOption(":video-filter=transform{type=hflip}");
