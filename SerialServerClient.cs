@@ -18,7 +18,7 @@ namespace TelescopeWatcher
         public void WriteLine(string command)
         {
             string encodedCmd = Uri.EscapeDataString(command);
-            string url = $"{serverUrl}/write?cmd={encodedCmd}";
+            string url = $"{serverUrl}/motor/write?cmd={encodedCmd}";
             
             System.Diagnostics.Debug.WriteLine($"Sending: {url}");
             
@@ -41,7 +41,7 @@ namespace TelescopeWatcher
         {
             try
             {
-                string url = $"{serverUrl}/read";
+                string url = $"{serverUrl}/motor/read";
                 var response = commandClient.GetAsync(url).Result;
                 
                 if (response.IsSuccessStatusCode)

@@ -1,3 +1,5 @@
+using LibVLCSharp.Shared;
+
 namespace TelescopeWatcher
 {
     internal static class Program
@@ -8,6 +10,7 @@ namespace TelescopeWatcher
         [STAThread]
         static void Main()
         {
+            Core.Initialize();
             ApplicationConfiguration.Initialize();
             Application.Run(new MainForm());
         }

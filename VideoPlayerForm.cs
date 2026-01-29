@@ -2,12 +2,14 @@ using System.Net.Http;
 using System.Text;
 using System.IO.Ports;
 using System.Diagnostics;
+using LibVLCSharp.Shared;
+using LibVLCSharp.WinForms;
 
 namespace TelescopeWatcher
 {
     public partial class VideoPlayerForm : Form
     {
-        private PictureBox pictureBox1;
+        private VideoView videoView1;
         private PictureBox pictureBox2;
         private Panel videoPanel;
         private Button btnClose;
@@ -36,22 +38,20 @@ namespace TelescopeWatcher
         private Label lblFocusSpeed;
         private Label lblFocusSpeedValue;
         
-        private readonly string mjpegUrl1;
+        private readonly string serverBaseUrl;
         private readonly string mjpegUrl2;
-        private HttpClient? httpClient1;
         private HttpClient? httpClient2;
         private CancellationTokenSource? cancellationToken;
-        private Task? streamTask1;
         private Task? streamTask2;
         private bool isStreaming = false;
-        private int frameCount1 = 0;
         private int frameCount2 = 0;
-        private DateTime lastFrameTime1 = DateTime.Now;
         private DateTime lastFrameTime2 = DateTime.Now;
-        private DateTime lastFpsUpdate1 = DateTime.Now;
         private DateTime lastFpsUpdate2 = DateTime.Now;
         private bool flipHorizontal = true;
         private bool flipVertical = true;
+
+        private LibVLC? libVLC;
+        private MediaPlayer? mediaPlayer1;
         
         // Circle overlay fields
         private bool isAddingCircle = false;
@@ -80,8 +80,18 @@ namespace TelescopeWatcher
         public VideoPlayerForm(string serverUrl, SerialPort? port = null, SerialServerClient? client = null, 
                                int stepsPerSecond = 100, int focusMotorSpeed = 9, Action<string>? logCallback = null)
         {
-            this.mjpegUrl1 = $"{serverUrl}:8080/?action=stream";
-            this.mjpegUrl2 = $"{serverUrl}:8081/?action=stream";
+            this.serverBaseUrl = serverUrl;
+            
+            try
+            {
+                var uri = new Uri(serverUrl);
+                this.mjpegUrl2 = $"{uri.Scheme}://{uri.Host}:5002/?action=stream";
+            }
+            catch
+            {
+                // Fallback for raw IP or other formats
+                this.mjpegUrl2 = $"{serverUrl}:5002/?action=stream"; 
+            }
             
             this.serialPort = port;
             this.serverClient = client;
@@ -152,7 +162,7 @@ namespace TelescopeWatcher
 
         private void InitializeComponent()
         {
-            this.Text = "Video Stream - MJPEG";
+            this.Text = "Video Stream - RTSP/MJPEG";
             this.Size = new System.Drawing.Size(1200, 680);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable;
@@ -160,10 +170,9 @@ namespace TelescopeWatcher
             
             this.KeyPreview = true;
             
-            this.DoubleBuffered = true;
-            this.SetStyle(ControlStyles.OptimizedDoubleBuffer | 
-                          ControlStyles.AllPaintingInWmPaint | 
-                          ControlStyles.UserPaint, true);
+            // Note: VideoView handles its own buffering/rendering on a separate window handle
+            // This might cause flickering when resizing if not handled carefully, 
+            // but ControlStyles don't affect it much.
 
             lblStatus = new Label
             {
@@ -344,9 +353,8 @@ namespace TelescopeWatcher
                 BackColor = System.Drawing.Color.Black
             };
 
-            pictureBox1 = new PictureBox
+            videoView1 = new VideoView
             {
-                SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = System.Drawing.Color.Black,
                 Dock = DockStyle.Fill
             };
@@ -362,7 +370,7 @@ namespace TelescopeWatcher
 
             lblFrameInfo1 = new Label
             {
-                Text = "Main: Frame 0 | FPS: 0.0",
+                Text = "Main: RTSP Stream",
                 Height = 25,
                 TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
                 BackColor = System.Drawing.Color.Black,
@@ -384,7 +392,7 @@ namespace TelescopeWatcher
                 Dock = DockStyle.Bottom
             };
 
-            videoPanel.Controls.Add(pictureBox1);
+            videoPanel.Controls.Add(videoView1);
             videoPanel.Controls.Add(pictureBox2);
 
             // Telescope control panel
@@ -611,8 +619,8 @@ namespace TelescopeWatcher
         {
             if (radioMainOnly.Checked)
             {
-                pictureBox1.Visible = true;
-                pictureBox1.Dock = DockStyle.Fill;
+                videoView1.Visible = true;
+                videoView1.Dock = DockStyle.Fill;
                 pictureBox2.Visible = false;
                 pictureBox2.Dock = DockStyle.None;
                 lblFrameInfo1.Visible = true;
@@ -620,8 +628,8 @@ namespace TelescopeWatcher
             }
             else if (radioSecondaryOnly.Checked)
             {
-                pictureBox1.Visible = false;
-                pictureBox1.Dock = DockStyle.None;
+                videoView1.Visible = false;
+                videoView1.Dock = DockStyle.None;
                 pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Fill;
                 lblFrameInfo1.Visible = false;
@@ -629,10 +637,12 @@ namespace TelescopeWatcher
             }
             else if (radioBoth.Checked)
             {
-                pictureBox1.Visible = true;
-                pictureBox1.Dock = DockStyle.Fill;
+                videoView1.Visible = true;
+                videoView1.Dock = DockStyle.Fill;
                 pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Right;
+                // Note: LibVLC VideoView might fight for layout space if not careful.
+                // Dock Right for pictureBox2 gets priority, Fill fills remaining.
                 pictureBox2.Width = this.ClientSize.Width / 2;
                 lblFrameInfo1.Visible = true;
                 lblFrameInfo2.Visible = true;
@@ -654,18 +664,47 @@ namespace TelescopeWatcher
             {
                 UpdateStatus("Connecting to streams...", System.Drawing.Color.DarkOrange);
                 
-                httpClient1 = new HttpClient();
-                httpClient1.Timeout = TimeSpan.FromMinutes(5);
+                // Initialize LibVLC for Main Stream
+                try 
+                {
+                    libVLC = new LibVLC();
+                    var host = new Uri(serverBaseUrl).Host;
+                    var rtspUrl = $"rtsp://{host}:8554/cam";
+                    
+                    System.Diagnostics.Debug.WriteLine($"Connecting to Main RTSP: {rtspUrl}");
+
+                    mediaPlayer1 = new MediaPlayer(libVLC);
+                    videoView1.MediaPlayer = mediaPlayer1;
+
+                    var media = new Media(libVLC, rtspUrl, FromType.FromLocation);
+                    // Low latency options
+                    media.AddOption(":network-caching=150");
+                    media.AddOption(":clock-jitter=0");
+                    media.AddOption(":clock-synchro=0");
+                    
+                    if (flipHorizontal && flipVertical) media.AddOption(":video-filter=transform{type=180}");
+                    else if (flipHorizontal) media.AddOption(":video-filter=transform{type=hflip}");
+                    else if (flipVertical) media.AddOption(":video-filter=transform{type=vflip}");
+
+                    mediaPlayer1.Play(media);
+                    UpdateFrameInfo(0, 0, 1); // Reset text
+                }
+                catch (Exception ex)
+                {
+                     System.Diagnostics.Debug.WriteLine($"Failed to start LibVLC: {ex.Message}");
+                     MessageBox.Show($"Failed to initialize RTSP player: {ex.Message}", "RTSP Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                // Initialize MJPEG for Secondary Stream
                 httpClient2 = new HttpClient();
                 httpClient2.Timeout = TimeSpan.FromMinutes(5);
                 
                 cancellationToken = new CancellationTokenSource();
                 isStreaming = true;
 
-                streamTask1 = StartStreamTask(mjpegUrl1, 1);
                 streamTask2 = StartStreamTask(mjpegUrl2, 2);
 
-                UpdateStatus("Streams connected - receiving frames...", System.Drawing.Color.DarkGreen);
+                UpdateStatus("Streams connected", System.Drawing.Color.DarkGreen);
             }
             catch (Exception ex)
             {
@@ -679,7 +718,7 @@ namespace TelescopeWatcher
         {
             return Task.Run(async () =>
             {
-                var httpClient = streamId == 1 ? httpClient1 : httpClient2;
+                var httpClient = httpClient2;
                 
                 try
                 {
@@ -708,22 +747,19 @@ namespace TelescopeWatcher
                             int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken.Token);
                             
 
-                            if (bytesRead == 0)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Ended");
-                                break;
-                            }
+                            if (bytesRead == 0) break;
 
                             for (int i = 0; i < bytesRead; i++)
                             {
                                 frameBuffer.Add(buffer[i]);
                                 
 
-                                if (frameBuffer.Count < 2)
-                                    continue;
+                                if (frameBuffer.Count < 2) continue;
                                 
                                 int len = frameBuffer.Count;
                                 
+
+
                                 if (frameBuffer[len - 2] == 0xFF && frameBuffer[len - 1] == 0xD9)
                                 {
                                     int startIndex = -1;
@@ -747,25 +783,15 @@ namespace TelescopeWatcher
                                             using var ms = new MemoryStream(jpegData);
                                             var image = Image.FromStream(ms);
                                             
+
+                                            // Handle flipping for MJPEG only (Secondary)
                                             if (flipHorizontal || flipVertical)
                                             {
                                                 var bitmap = new Bitmap(image);
-                                            
-
-
-                                                if (flipHorizontal && flipVertical)
-                                                {
-                                                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
-                                                }
-                                                else if (flipHorizontal)
-                                                {
-                                                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
-                                                }
-                                                else if (flipVertical)
-                                                {
-                                                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
-                                                }
-                                            
+                                                if (flipHorizontal && flipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
+                                                else if (flipHorizontal) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                                                else if (flipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
+                                                
 
                                                 UpdateImage(bitmap, streamId);
                                                 image.Dispose();
@@ -775,42 +801,19 @@ namespace TelescopeWatcher
                                                 UpdateImage(image, streamId);
                                             }
                                             
-                                            if (streamId == 1)
+                                            frameCount2++;
+                                            var now = DateTime.Now;
+                                            var elapsed = (now - lastFrameTime2).TotalSeconds;
+                                            if (elapsed > 0)
                                             {
-                                                frameCount1++;
-                                                var now = DateTime.Now;
-                                                var elapsed = (now - lastFrameTime1).TotalSeconds;
-                                                if (elapsed > 0)
+                                                double fps = 1.0 / elapsed;
+                                                if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
                                                 {
-                                                    double fps = 1.0 / elapsed;
-                                                
-            
-                                                    if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
-                                                    {
-                                                        UpdateFrameInfo(frameCount1, fps, 1);
-                                                        lastFpsUpdate1 = now;
-                                                    }
+                                                    UpdateFrameInfo(frameCount2, fps, 2);
+                                                    lastFpsUpdate2 = now;
                                                 }
-                                                lastFrameTime1 = now;
                                             }
-                                            else
-                                            {
-                                                frameCount2++;
-                                                var now = DateTime.Now;
-                                                var elapsed = (now - lastFrameTime2).TotalSeconds;
-                                                if (elapsed > 0)
-                                                {
-                                                    double fps = 1.0 / elapsed;
-                                                
-            
-                                                    if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
-                                                    {
-                                                        UpdateFrameInfo(frameCount2, fps, 2);
-                                                        lastFpsUpdate2 = now;
-                                                    }
-                                                }
-                                                lastFrameTime2 = now;
-                                            }
+                                            lastFrameTime2 = now;
                                         }
                                         catch (Exception ex)
                                         {
@@ -821,10 +824,7 @@ namespace TelescopeWatcher
                                     frameBuffer.Clear();
                                 }
                                 
-                                if (frameBuffer.Count > 500000)
-                                {
-                                    frameBuffer.Clear();
-                                }
+                                if (frameBuffer.Count > 500000) frameBuffer.Clear();
                             }
                         }
                         catch (Exception ex)
@@ -834,31 +834,26 @@ namespace TelescopeWatcher
                         }
                     }
                 }
-                catch (TaskCanceledException)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Stopped");
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Error: {ex}");
-                }
+                catch (TaskCanceledException) { }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Error: {ex}"); }
             }, cancellationToken!.Token);
         }
 
         private void UpdateImage(Image image, int streamId)
         {
-            var pictureBox = streamId == 1 ? pictureBox1 : pictureBox2;
+            // Only for Stream 2 (Secondary)
+            if (streamId != 2) return;
             
-            if (pictureBox.InvokeRequired)
+            if (pictureBox2.InvokeRequired)
             {
-                pictureBox.Invoke(new Action<Image, int>(UpdateImage), image, streamId);
+                pictureBox2.Invoke(new Action<Image, int>(UpdateImage), image, streamId);
                 return;
             }
 
-            var oldImage = pictureBox.Image;
-            bool wasFirstFrame = (oldImage == null && streamId == 2);
+            var oldImage = pictureBox2.Image;
+            bool wasFirstFrame = (oldImage == null);
             
-            pictureBox.Image = image;
+            pictureBox2.Image = image;
             oldImage?.Dispose();
             
             if (wasFirstFrame && whiteCirclePositionRelative.HasValue)
@@ -883,8 +878,16 @@ namespace TelescopeWatcher
         private void UpdateFrameInfo(int frames, double fps, int streamId)
         {
             var label = streamId == 1 ? lblFrameInfo1 : lblFrameInfo2;
-            string cameraName = streamId == 1 ? "Main" : "Secondary";
-            string newText = $"{cameraName}: Frame {frames} | FPS: {fps:F1}";
+            string newText;
+            
+            if (streamId == 1)
+            {
+                newText = "Main: RTSP Stream Playing";
+            }
+            else
+            {
+                newText = $"Secondary: Frame {frames} | FPS: {fps:F1}";
+            }
             
             if (label.InvokeRequired)
             {
@@ -920,15 +923,26 @@ namespace TelescopeWatcher
 
             try
             {
-                streamTask1?.Wait(TimeSpan.FromSeconds(2));
                 streamTask2?.Wait(TimeSpan.FromSeconds(2));
             }
             catch { }
 
+            // Stop and dispose LibVLC
+            if (mediaPlayer1 != null)
+            {
+                mediaPlayer1.Stop();
+                mediaPlayer1.Dispose();
+                mediaPlayer1 = null;
+            }
+            
+            if (libVLC != null)
+            {
+                libVLC.Dispose();
+                libVLC = null;
+            }
+
             cancellationToken?.Dispose();
-            httpClient1?.Dispose();
             httpClient2?.Dispose();
-            pictureBox1?.Image?.Dispose();
             pictureBox2?.Image?.Dispose();
         }
 
@@ -1089,28 +1103,28 @@ namespace TelescopeWatcher
 
                 if (direction == "UP")
                 {
-                    motorCommand = "v=0";
-                    directionCommand = "d=0";
+                    motorCommand = "v=1";
+                    directionCommand = "d=1";
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
                 }
                 else if (direction == "DOWN")
                 {
-                    motorCommand = "v=0";
-                    directionCommand = "d=1";
+                    motorCommand = "v=1";
+                    directionCommand = "d=0";
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
                 }
                 else if (direction == "LEFT")
                 {
-                    motorCommand = "v=1";
+                    motorCommand = "v=0";
                     directionCommand = "d=0";
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
                 }
                 else
                 {
-                    motorCommand = "v=1";
+                    motorCommand = "v=0";
                     directionCommand = "d=1";
                     WriteCommand(motorCommand);
                     Thread.Sleep(50);
@@ -1540,7 +1554,9 @@ namespace TelescopeWatcher
         {
             try
             {
-                string url = "http://192.168.4.1:8081/control.htm";
+                // Update to port 5002 for UC60 (MJPG) control
+                var host = new Uri(serverBaseUrl).Host;
+                string url = $"http://{host}:5002/control.htm";
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = url,

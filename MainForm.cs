@@ -9,7 +9,7 @@ namespace TelescopeWatcher
         private string? selectedPort;
         private TelescopeControlForm? telescopeControlForm;
         private bool isServerMode = true; // Default to server mode
-        private string serverUrl = "http://192.168.4.1:5002";
+        private string serverUrl = "http://192.168.4.1:5000";
         private const string PI_SSID = "RaspberryPiCam";
 
         public MainForm()
@@ -21,7 +21,7 @@ namespace TelescopeWatcher
         {
             RefreshPortList();
             UpdateUIForConnectionMode();
-            AddStatusMessage("Application started. Default mode: HTTP Server (192.168.4.1:5002)");
+            AddStatusMessage("Application started. Default mode: HTTP Server (192.168.4.1:5000)");
 
              // Check Wifi connection
             await CheckWifiConnectionAsync();
@@ -54,7 +54,7 @@ namespace TelescopeWatcher
                 txtServerUrl.Enabled = true;
                 listBoxPorts.Enabled = false;
                 btnRefresh.Enabled = false;
-                lblPorts.Text = "Server Mode - Port 5002";
+                lblPorts.Text = "Server Mode - Port 5000";
             }
             else
             {
@@ -70,11 +70,11 @@ namespace TelescopeWatcher
             RefreshPortList();
         }
 
-        private void btnConnect_Click(object sender, EventArgs e)
+        private async void btnConnect_Click(object sender, EventArgs e)
         {
             if (isServerMode)
             {
-                ConnectToServer();
+                await ConnectToServer();
             }
             else
             {
@@ -95,7 +95,7 @@ namespace TelescopeWatcher
             DisconnectFromPort();
         }
 
-        private void ConnectToServer()
+        private async Task ConnectToServer()
         {
             try
             {
@@ -108,24 +108,39 @@ namespace TelescopeWatcher
                     return;
                 }
 
-                // Construct full URL with fixed port 5002 and add http:// if missing
+                // Ensure protocol is present
                 if (!serverIp.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
                     !serverIp.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 {
-                    serverUrl = $"http://{serverIp}:5002";
+                    serverIp = $"http://{serverIp}";
                 }
-                else
+
+                // Construct full URL with fixed port 5000 if not specified
+                UriBuilder uriBuilder = new UriBuilder(serverIp);
+                
+                // If the user input (stripped of protocol) doesn't contain a colon, assume port is missing
+                string checkIp = serverIp;
+                int protoIndex = checkIp.IndexOf("://");
+                if (protoIndex >= 0) checkIp = checkIp.Substring(protoIndex + 3);
+                
+                // Exclude IPv6 brackets if present when checking for colon
+                if (!checkIp.Contains(":") || (checkIp.StartsWith("[") && checkIp.EndsWith("]") && !checkIp.Substring(checkIp.IndexOf("]")).Contains(":")))
                 {
-                    // If user included http://, just add port
-                    serverUrl = serverIp.Contains(":") ? serverIp : $"{serverIp}:5002";
+                    uriBuilder.Port = 5000;
                 }
+                
+                // Remove default port 80 if it was auto-added but we want to depend on builder logic or what we just set
+                // Actually UriBuilder handles it fine.
+                
+                serverUrl = uriBuilder.ToString().TrimEnd('/');
                 
                 AddStatusMessage($"Connecting to server: {serverUrl}");
                 
                 using (var client = new System.Net.Http.HttpClient())
                 {
-                    client.Timeout = TimeSpan.FromSeconds(5);
-                    var response = client.GetAsync($"{serverUrl}/read").Result;
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    // Use /motor/read to match backend API and ensure connection works
+                    var response = await client.GetAsync($"{serverUrl}/motor/read");
                     
                     if (response.IsSuccessStatusCode)
                     {

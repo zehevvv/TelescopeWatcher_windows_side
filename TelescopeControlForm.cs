@@ -210,13 +210,11 @@ namespace TelescopeWatcher
                 btnVideoStart.Enabled = false;
                 AddLogMessage("Starting video streams...");
 
-                // Extract base URL for secondary server
                 var uri = new Uri(videoServerUrl);
-                string secondaryServerUrl = $"{uri.Scheme}://{uri.Host}:5001";
-
-                // Start both video servers
-                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/start");
-                var response2Task = videoHttpClient.GetAsync($"{secondaryServerUrl}/start");
+                
+                // Start both video streams via unified server
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/hd/start");
+                var response2Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/uc60/start");
 
                 var response1 = await response1Task;
                 var response2 = await response2Task;
@@ -256,7 +254,7 @@ namespace TelescopeWatcher
                                 AddLogMessage("Video player window closed");
                             };
 
-                            AddLogMessage($"Video player opened - Main: {baseUrl}:8080, Secondary: {baseUrl}:8081");
+                            AddLogMessage($"Video player opened - Server: {baseUrl}:5000");
                         }
                         catch (Exception ex)
                         {
@@ -277,23 +275,23 @@ namespace TelescopeWatcher
                     if (!mainSuccess)
                     {
                         string mainError = await response1.Content.ReadAsStringAsync();
-                        error += $"Main stream (port 5000): {mainError}\n";
-                        AddLogMessage($"Failed to start main video stream: {mainError}");
+                        error += $"HD Camera (/cam/hd): {mainError}\n";
+                        AddLogMessage($"Failed to start HD camera: {mainError}");
                     }
                     else
                     {
-                        AddLogMessage("Main video stream started successfully");
+                        AddLogMessage("HD camera started successfully");
                     }
 
                     if (!secondarySuccess)
                     {
                         string secondaryError = await response2.Content.ReadAsStringAsync();
-                        error += $"Secondary stream (port 5001): {secondaryError}";
-                        AddLogMessage($"Failed to start secondary video stream: {secondaryError}");
+                        error += $"UC60 Camera (/cam/uc60): {secondaryError}";
+                        AddLogMessage($"Failed to start UC60 camera: {secondaryError}");
                     }
                     else
                     {
-                        AddLogMessage("Secondary video stream started successfully");
+                        AddLogMessage("UC60 camera started successfully");
                     }
 
                     if (!string.IsNullOrEmpty(error))
@@ -379,13 +377,9 @@ namespace TelescopeWatcher
                     AddLogMessage("Video player window closed");
                 }
 
-                // Extract base URL for secondary server
-                var uri = new Uri(videoServerUrl);
-                string secondaryServerUrl = $"{uri.Scheme}://{uri.Host}:5001";
-
                 // Stop both video servers
-                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/stop");
-                var response2Task = videoHttpClient.GetAsync($"{secondaryServerUrl}/stop");
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/hd/stop");
+                var response2Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/uc60/stop");
 
                 var response1 = await response1Task;
                 var response2 = await response2Task;
@@ -403,21 +397,21 @@ namespace TelescopeWatcher
                     if (!mainSuccess)
                     {
                         string error = await response1.Content.ReadAsStringAsync();
-                        AddLogMessage($"Failed to stop main video stream: {error}");
+                        AddLogMessage($"Failed to stop HD camera: {error}");
                     }
                     else
                     {
-                        AddLogMessage("Main video stream stopped successfully");
+                        AddLogMessage("HD camera stopped successfully");
                     }
 
                     if (!secondarySuccess)
                     {
                         string error = await response2.Content.ReadAsStringAsync();
-                        AddLogMessage($"Failed to stop secondary video stream: {error}");
+                        AddLogMessage($"Failed to stop UC60 camera: {error}");
                     }
                     else
                     {
-                        AddLogMessage("Secondary video stream stopped successfully");
+                        AddLogMessage("UC60 camera stopped successfully");
                     }
                 }
             }
@@ -449,12 +443,8 @@ namespace TelescopeWatcher
                 btnRestart.Enabled = false;
                 AddLogMessage("Sending restart command to server...");
 
-                // Extract base URL for restart endpoint
-                var uri = new Uri(videoServerUrl);
-                string restartUrl = $"{uri.Scheme}://{uri.Host}:5000/restart";
-
                 // Send restart command
-                var response = await videoHttpClient.GetAsync(restartUrl);
+                var response = await videoHttpClient.GetAsync($"{videoServerUrl}/restart");
 
                 if (response.IsSuccessStatusCode)
                 {
