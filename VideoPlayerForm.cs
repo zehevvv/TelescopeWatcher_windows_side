@@ -64,9 +64,10 @@ namespace TelescopeWatcher
         private Point currentMousePosition;
 
         // Telescope control fields
-        private SerialPort? serialPort;
-        private SerialServerClient? serverClient;
-        private bool isServerMode = false;
+        private TelescopeController telescopeController;
+        private MjpegStreamClient mjpegClient;
+        
+        // Removed separate connection fields managed by controller
         private bool isKeyPressed = false;
         private bool isFocusKeyPressed = false;
         private string currentDirection = "";
@@ -74,10 +75,9 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
         private System.Windows.Forms.Timer fpsTimer; // Added frame timer
-        private int timeBetweenSteps = 10;
-        private int focusSpeed = 9;
-        private Action<string>? logCallback;
         private int lastDisplayedPictures = 0; // For FPS calc
+
+        private Action<string>? logCallback;
 
         public VideoPlayerForm(string serverUrl, SerialPort? port = null, SerialServerClient? client = null, 
                                int stepsPerSecond = 100, int focusMotorSpeed = 9, Action<string>? logCallback = null)
@@ -95,22 +95,26 @@ namespace TelescopeWatcher
                 this.mjpegUrl2 = $"{serverUrl}:5002/?action=stream"; 
             }
             
-            this.serialPort = port;
-            this.serverClient = client;
-            this.isServerMode = (client != null);
             this.logCallback = logCallback;
             
-            // Use shared settings
+            // Initialize Helpers
+            this.telescopeController = new TelescopeController(port, client, logCallback);
+            this.mjpegClient = new MjpegStreamClient();
+            this.mjpegClient.FrameReceived += MjpegClient_FrameReceived;
+            
+            // Use shared settings via Controller
             var settings = TelescopeSettings.Instance;
-            settings.StepsPerSecond = stepsPerSecond;
-            settings.FocusSpeed = focusMotorSpeed;
-            this.focusSpeed = settings.FocusSpeed;
-            this.timeBetweenSteps = settings.TimeBetweenSteps;
+            telescopeController.TimeBetweenSteps = settings.TimeBetweenSteps;
+            telescopeController.FocusSpeed = settings.FocusSpeed;
             
             // Subscribe to settings changes
             settings.StepsPerSecondChanged += OnStepsPerSecondChanged;
             settings.FocusSpeedChanged += OnFocusSpeedChanged;
             
+            // Initialize other fields (retaining defaults in case)
+            settings.StepsPerSecond = stepsPerSecond;
+            settings.FocusSpeed = focusMotorSpeed;
+
             InitializeComponent();
             this.FormClosing += VideoPlayerForm_FormClosing;
             LoadWhiteCirclePosition();
@@ -139,7 +143,7 @@ namespace TelescopeWatcher
             }
             
             var settings = TelescopeSettings.Instance;
-            this.timeBetweenSteps = settings.TimeBetweenSteps;
+            telescopeController.TimeBetweenSteps = settings.TimeBetweenSteps;
             
             // Update trackbar without triggering event
             trackBarStepsPerSecond.ValueChanged -= TrackBarStepsPerSecond_ValueChanged;
@@ -158,7 +162,7 @@ namespace TelescopeWatcher
             }
             
             var settings = TelescopeSettings.Instance;
-            this.focusSpeed = settings.FocusSpeed;
+            telescopeController.FocusSpeed = settings.FocusSpeed;
             
             // Update trackbar without triggering event
             trackBarFocusSpeed.ValueChanged -= TrackBarFocusSpeed_ValueChanged;
@@ -703,7 +707,7 @@ namespace TelescopeWatcher
                     };
                     mediaPlayer1.Opening += (s, args) => System.Diagnostics.Debug.WriteLine("[LibVLC] Opening media");
                     mediaPlayer1.Buffering += (s, args) => System.Diagnostics.Debug.WriteLine($"[LibVLC] Buffering: {args.Cache}%");
-                    
+
                     videoView1.MediaPlayer = mediaPlayer1;
 
                     var media = new Media(libVLC, rtspUrl, FromType.FromLocation);
@@ -734,13 +738,9 @@ namespace TelescopeWatcher
                 }
 
                 // Initialize MJPEG for Secondary Stream
-                httpClient2 = new HttpClient();
-                httpClient2.Timeout = TimeSpan.FromMinutes(5);
-                
-                cancellationToken = new CancellationTokenSource();
-                isStreaming = true;
-
-                streamTask2 = StartStreamTask(mjpegUrl2, 2);
+                mjpegClient.FlipHorizontal = flipHorizontal;
+                mjpegClient.FlipVertical = flipVertical;
+                await mjpegClient.StartStream(mjpegUrl2, 2);
 
                 UpdateStatus("Streams connected", System.Drawing.Color.DarkGreen);
             }
@@ -752,129 +752,24 @@ namespace TelescopeWatcher
             }
         }
 
-        private Task StartStreamTask(string mjpegUrl, int streamId)
+        private void MjpegClient_FrameReceived(object? sender, Image image)
         {
-            return Task.Run(async () =>
+            UpdateImage(image, 2);
+            
+            // FPS calculation logic for Mjpeg could be moved inside client too, but kept here for now
+            frameCount2++;
+            var now = DateTime.Now;
+            var elapsed = (now - lastFrameTime2).TotalSeconds;
+            if (elapsed > 0)
             {
-                var httpClient = httpClient2;
-                
-                try
+                double fps = 1.0 / elapsed;
+                if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - URL: {mjpegUrl}");
-                    
-                    var request = new HttpRequestMessage(HttpMethod.Get, mjpegUrl);
-                    var response = await httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken!.Token);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Stream {streamId} - HTTP Error: {response.StatusCode}");
-                        return;
-                    }
-
-                    System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Connected successfully");
-
-                    using var stream = await response.Content.ReadAsStreamAsync();
-                    
-                    byte[] buffer = new byte[1024];
-                    List<byte> frameBuffer = new List<byte>();
-                    
-                    while (!cancellationToken.Token.IsCancellationRequested)
-                    {
-                        try
-                        {
-                            int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken.Token);
-                            
-
-                            if (bytesRead == 0) break;
-
-                            for (int i = 0; i < bytesRead; i++)
-                            {
-                                frameBuffer.Add(buffer[i]);
-                                
-
-                                if (frameBuffer.Count < 2) continue;
-                                
-                                int len = frameBuffer.Count;
-                                
-
-
-                                if (frameBuffer[len - 2] == 0xFF && frameBuffer[len - 1] == 0xD9)
-                                {
-                                    int startIndex = -1;
-                                    for (int j = 0; j < frameBuffer.Count - 1; j++)
-                                    {
-                                        if (frameBuffer[j] == 0xFF && frameBuffer[j + 1] == 0xD8)
-                                        {
-                                            startIndex = j;
-                                            break;
-                                        }
-                                    }
-                                    
-                                    if (startIndex >= 0)
-                                    {
-                                        int frameLength = len - startIndex;
-                                        byte[] jpegData = new byte[frameLength];
-                                        frameBuffer.CopyTo(startIndex, jpegData, 0, frameLength);
-                                        
-                                        try
-                                        {
-                                            using var ms = new MemoryStream(jpegData);
-                                            var image = Image.FromStream(ms);
-                                            
-
-                                            // Handle flipping for MJPEG only (Secondary)
-                                            if (flipHorizontal || flipVertical)
-                                            {
-                                                var bitmap = new Bitmap(image);
-                                                if (flipHorizontal && flipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
-                                                else if (flipHorizontal) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
-                                                else if (flipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
-                                                
-
-                                                UpdateImage(bitmap, streamId);
-                                                image.Dispose();
-                                            }
-                                            else
-                                            {
-                                                UpdateImage(image, streamId);
-                                            }
-                                            
-                                            frameCount2++;
-                                            var now = DateTime.Now;
-                                            var elapsed = (now - lastFrameTime2).TotalSeconds;
-                                            if (elapsed > 0)
-                                            {
-                                                double fps = 1.0 / elapsed;
-                                                if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
-                                                {
-                                                    UpdateFrameInfo(frameCount2, fps, 2);
-                                                    lastFpsUpdate2 = now;
-                                                }
-                                            }
-                                            lastFrameTime2 = now;
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Error decoding: {ex.Message}");
-                                        }
-                                    }
-                                    
-                                    frameBuffer.Clear();
-                                }
-                                
-                                if (frameBuffer.Count > 500000) frameBuffer.Clear();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Read error: {ex.Message}");
-                            frameBuffer.Clear();
-                        }
-                    }
+                    UpdateFrameInfo(frameCount2, fps, 2);
+                    lastFpsUpdate2 = now;
                 }
-                catch (TaskCanceledException) { }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Stream {streamId} - Error: {ex}"); }
-            }, cancellationToken!.Token);
+            }
+            lastFrameTime2 = now;
         }
 
         private void UpdateImage(Image image, int streamId)
@@ -978,18 +873,14 @@ namespace TelescopeWatcher
             focusTimer?.Dispose();
             fpsTimer?.Stop();
             fpsTimer?.Dispose();
+            
+            mjpegClient?.Dispose();
         }
 
         private void StopStreaming()
         {
             isStreaming = false;
-            cancellationToken?.Cancel();
-
-            try
-            {
-                streamTask2?.Wait(TimeSpan.FromSeconds(2));
-            }
-            catch { }
+            mjpegClient?.StopStreaming();
 
             // Stop and dispose LibVLC
             if (mediaPlayer1 != null)
@@ -1005,20 +896,20 @@ namespace TelescopeWatcher
                 libVLC = null;
             }
 
-            cancellationToken?.Dispose();
-            httpClient2?.Dispose();
             pictureBox2?.Image?.Dispose();
         }
 
         private void ChkFlipHorizontal_CheckedChanged(object? sender, EventArgs e)
         {
             flipHorizontal = chkFlipHorizontal.Checked;
+            if (mjpegClient != null) mjpegClient.FlipHorizontal = flipHorizontal;
             System.Diagnostics.Debug.WriteLine($"Flip Horizontal: {flipHorizontal}");
         }
 
         private void ChkFlipVertical_CheckedChanged(object? sender, EventArgs e)
         {
             flipVertical = chkFlipVertical.Checked;
+            if (mjpegClient != null) mjpegClient.FlipVertical = flipVertical;
             System.Diagnostics.Debug.WriteLine($"Flip Vertical: {flipVertical}");
         }
 
@@ -1041,7 +932,7 @@ namespace TelescopeWatcher
             {
                 isKeyPressed = true;
                 currentDirection = "UP";
-                SendTelescopeCommand("UP");
+                telescopeController.SendMoveCommand("UP");
                 commandTimer.Start();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
@@ -1051,7 +942,7 @@ namespace TelescopeWatcher
             {
                 isKeyPressed = true;
                 currentDirection = "DOWN";
-                SendTelescopeCommand("DOWN");
+                telescopeController.SendMoveCommand("DOWN");
                 commandTimer.Start();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
@@ -1061,7 +952,7 @@ namespace TelescopeWatcher
             {
                 isKeyPressed = true;
                 currentDirection = "LEFT";
-                SendTelescopeCommand("LEFT");
+                telescopeController.SendMoveCommand("LEFT");
                 commandTimer.Start();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
@@ -1071,7 +962,7 @@ namespace TelescopeWatcher
             {
                 isKeyPressed = true;
                 currentDirection = "RIGHT";
-                SendTelescopeCommand("RIGHT");
+                telescopeController.SendMoveCommand("RIGHT");
                 commandTimer.Start();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
@@ -1081,7 +972,7 @@ namespace TelescopeWatcher
             {
                 isFocusKeyPressed = true;
                 currentFocusDirection = "INCREASE";
-                SendFocusCommand("INCREASE");
+                telescopeController.SendFocusCommand("INCREASE");
                 focusTimer.Start();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
@@ -1091,7 +982,7 @@ namespace TelescopeWatcher
             {
                 isFocusKeyPressed = true;
                 currentFocusDirection = "DECREASE";
-                SendFocusCommand("DECREASE");
+                telescopeController.SendFocusCommand("DECREASE");
                 focusTimer.Start();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
@@ -1105,7 +996,7 @@ namespace TelescopeWatcher
             {
                 isKeyPressed = false;
                 commandTimer.Stop();
-                SendStopCommand();
+                telescopeController.SendStopCommand();
                 string keyName = e.KeyCode == Keys.Up ? "UP" :
                                  e.KeyCode == Keys.Down ? "DOWN" :
                                  e.KeyCode == Keys.Left ? "LEFT" : "RIGHT";
@@ -1117,7 +1008,7 @@ namespace TelescopeWatcher
             {
                 isFocusKeyPressed = false;
                 focusTimer.Stop();
-                SendFocusStopCommand();
+                telescopeController.SendFocusStopCommand();
                 string keyName = e.KeyCode == Keys.PageUp ? "PageUp" : "PageDown";
                 LogMessage($"{keyName} key released - stopped focus commands");
                 currentFocusDirection = "";
@@ -1129,7 +1020,7 @@ namespace TelescopeWatcher
         {
             if (!string.IsNullOrEmpty(currentDirection))
             {
-                SendStepsCommand();
+                telescopeController.SendStepsCommand();
             }
         }
 
@@ -1137,244 +1028,7 @@ namespace TelescopeWatcher
         {
             if (!string.IsNullOrEmpty(currentFocusDirection))
             {
-                SendFocusStepsCommand();
-            }
-        }
-
-        private void SendTelescopeCommand(string direction)
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    LogMessage("Error: Server connection is not available!");
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    LogMessage("Error: Serial port is not open!");
-                    return;
-                }
-            }
-
-            try
-            {
-                string motorCommand;
-                string directionCommand;
-
-                if (direction == "UP")
-                {
-                    motorCommand = "v=1";
-                    directionCommand = "d=1";
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                }
-                else if (direction == "DOWN")
-                {
-                    motorCommand = "v=1";
-                    directionCommand = "d=0";
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                }
-                else if (direction == "LEFT")
-                {
-                    motorCommand = "v=0";
-                    directionCommand = "d=0";
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                }
-                else
-                {
-                    motorCommand = "v=0";
-                    directionCommand = "d=1";
-                    WriteCommand(motorCommand);
-                    Thread.Sleep(50);
-                }
-
-                WriteCommand(directionCommand);
-                Thread.Sleep(50);
-
-                string timeCommand = timeBetweenSteps == 0 ? "t=0.1" : $"t={timeBetweenSteps}";
-                WriteCommand(timeCommand);
-                Thread.Sleep(50);
-
-                string stepsCommand = "s=10000";
-                WriteCommand(stepsCommand);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error sending command: {ex.Message}");
-            }
-        }
-
-        private void SendStepsCommand()
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    commandTimer.Stop();
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    commandTimer.Stop();
-                    return;
-                }
-            }
-
-            try
-            {
-                string stepsCommand = "s=10000";
-                WriteCommand(stepsCommand);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error sending command: {ex.Message}");
-                commandTimer.Stop();
-            }
-        }
-
-        private void SendStopCommand()
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    return;
-                }
-            }
-
-            try
-            {
-                string stopCommand = "s=0";
-                WriteCommand(stopCommand);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error sending stop command: {ex.Message}");
-            }
-        }
-
-        private void SendFocusCommand(string direction)
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    LogMessage("Error: Server connection is not available!");
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    LogMessage("Error: Serial port is not open!");
-                    return;
-                }
-            }
-
-            try
-            {
-                string speedCommand = $"b={focusSpeed}";
-                WriteCommand(speedCommand);
-                Thread.Sleep(50);
-
-                string directionCommand = direction == "INCREASE" ? "a=1" : "a=0";
-                WriteCommand(directionCommand);
-                Thread.Sleep(50);
-
-                string stepsCommand = "c=100";
-                WriteCommand(stepsCommand);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error sending focus command: {ex.Message}");
-            }
-        }
-
-        private void SendFocusStepsCommand()
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    focusTimer.Stop();
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    focusTimer.Stop();
-                    return;
-                }
-            }
-
-            try
-            {
-                string stepsCommand = "c=100";
-                WriteCommand(stepsCommand);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error sending focus steps command: {ex.Message}");
-                focusTimer.Stop();
-            }
-        }
-
-        private void SendFocusStopCommand()
-        {
-            if (isServerMode)
-            {
-                if (serverClient == null || !serverClient.IsConnected())
-                {
-                    return;
-                }
-            }
-            else
-            {
-                if (serialPort == null || !serialPort.IsOpen)
-                {
-                    return;
-                }
-            }
-
-            try
-            {
-                string stopCommand = "c=0";
-                WriteCommand(stopCommand);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error sending focus stop command: {ex.Message}");
-            }
-        }
-
-        private void WriteCommand(string command)
-        {
-            if (isServerMode)
-            {
-                serverClient?.WriteLine(command);
-            }
-            else
-            {
-                serialPort?.WriteLine(command);
+                telescopeController.SendFocusStepsCommand();
             }
         }
 
@@ -1385,110 +1039,6 @@ namespace TelescopeWatcher
         }
 
         #endregion
-
-        #region Circle Overlay Methods
-
-        private void BtnAddCircle_Click(object? sender, EventArgs e)
-        {
-            isAddingCircle = !isAddingCircle;
-            
-            if (isAddingCircle)
-            {
-                btnAddCircle.Text = "Stop Adding";
-                btnAddCircle.BackColor = System.Drawing.Color.DarkGreen;
-                
-                pictureBox2.MouseMove += PictureBox2_MouseMove;
-                pictureBox2.MouseClick += PictureBox2_MouseClick;
-                pictureBox2.Paint += PictureBox2_Paint;
-                pictureBox2.Invalidate();
-            }
-            else
-            {
-                btnAddCircle.Text = "Add Circle";
-                btnAddCircle.BackColor = System.Drawing.Color.DarkRed;
-                
-                pictureBox2.MouseMove -= PictureBox2_MouseMove;
-                pictureBox2.MouseClick -= PictureBox2_MouseClick;
-                pictureBox2.Invalidate();
-            }
-        }
-
-        private void BtnCircleSizeIncrease_Click(object? sender, EventArgs e)
-        {
-            if (circleRadius < MAX_RADIUS)
-            {
-                circleRadius += 5;
-                lblCircleSize.Text = $"{circleRadius}";
-                pictureBox2.Invalidate();
-            }
-        }
-
-        private void BtnCircleSizeDecrease_Click(object? sender, EventArgs e)
-        {
-            if (circleRadius > MIN_RADIUS)
-            {
-                circleRadius -= 5;
-                lblCircleSize.Text = $"{circleRadius}";
-                pictureBox2.Invalidate();
-            }
-        }
-
-        private void PictureBox2_MouseMove(object? sender, MouseEventArgs e)
-        {
-            currentMousePosition = e.Location;
-            pictureBox2.Invalidate();
-        }
-
-        private void PictureBox2_MouseClick(object? sender, MouseEventArgs e)
-        {
-            if (isAddingCircle && e.Button == MouseButtons.Left)
-            {
-                Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
-                
-                if (displayRect.Width > 0 && displayRect.Height > 0)
-                {
-                    int imageX = e.Location.X - displayRect.X;
-                    int imageY = e.Location.Y - displayRect.Y;
-                    
-                    float relativeX = (float)imageX / displayRect.Width;
-                    float relativeY = (float)imageY / displayRect.Height;
-                    
-                    relativeX = Math.Max(0, Math.Min(1, relativeX));
-                    relativeY = Math.Max(0, Math.Min(1, relativeY));
-                    
-                    whiteCirclePositionRelative = new PointF(relativeX, relativeY);
-                    whiteCirclePosition = e.Location;
-                    whiteCircleRadius = circleRadius;
-                    
-                    SaveWhiteCirclePosition();
-                    pictureBox2.Invalidate();
-                    System.Diagnostics.Debug.WriteLine($"White circle placed at: {whiteCirclePosition} ({relativeX:P1}, {relativeY:P1}) in display rect {displayRect} with radius: {whiteCircleRadius}");
-                }
-            }
-        }
-
-        private void PictureBox2_Paint(object? sender, PaintEventArgs e)
-        {
-            if (whiteCirclePosition.HasValue)
-            {
-                using (Pen whitePen = new Pen(Color.White, 2))
-                {
-                    int x = whiteCirclePosition.Value.X - whiteCircleRadius;
-                    int y = whiteCirclePosition.Value.Y - whiteCircleRadius;
-                    e.Graphics.DrawEllipse(whitePen, x, y, whiteCircleRadius * 2, whiteCircleRadius * 2);
-                }
-            }
-
-            if (isAddingCircle)
-            {
-                using (Pen redPen = new Pen(Color.Red, 2))
-                {
-                    int x = currentMousePosition.X - circleRadius;
-                    int y = currentMousePosition.Y - circleRadius;
-                    e.Graphics.DrawEllipse(redPen, x, y, circleRadius * 2, circleRadius * 2);
-                }
-            }
-        }
 
         private void LoadWhiteCirclePosition()
         {
@@ -1524,6 +1074,22 @@ namespace TelescopeWatcher
             }
         }
 
+        private void UpdateWhiteCircleAbsolutePosition()
+        {
+            if (whiteCirclePositionRelative.HasValue && pictureBox2 != null && pictureBox2.Image != null)
+            {
+                Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
+                
+                if (displayRect.Width > 0 && displayRect.Height > 0)
+                {
+                    int absoluteX = displayRect.X + (int)(whiteCirclePositionRelative.Value.X * displayRect.Width);
+                    int absoluteY = displayRect.Y + (int)(whiteCirclePositionRelative.Value.Y * displayRect.Height);
+                    whiteCirclePosition = new Point(absoluteX, absoluteY);
+                    System.Diagnostics.Debug.WriteLine($"Updated absolute position: {whiteCirclePosition} from relative ({whiteCirclePositionRelative.Value.X:P1}, {whiteCirclePositionRelative.Value.Y:P1}) for display rect {displayRect}");
+                }
+            }
+        }
+
         private void SaveWhiteCirclePosition()
         {
             try
@@ -1543,22 +1109,6 @@ namespace TelescopeWatcher
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error saving white circle position: {ex.Message}");
-            }
-        }
-
-        private void UpdateWhiteCircleAbsolutePosition()
-        {
-            if (whiteCirclePositionRelative.HasValue && pictureBox2 != null && pictureBox2.Image != null)
-            {
-                Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
-                
-                if (displayRect.Width > 0 && displayRect.Height > 0)
-                {
-                    int absoluteX = displayRect.X + (int)(whiteCirclePositionRelative.Value.X * displayRect.Width);
-                    int absoluteY = displayRect.Y + (int)(whiteCirclePositionRelative.Value.Y * displayRect.Height);
-                    whiteCirclePosition = new Point(absoluteX, absoluteY);
-                    System.Diagnostics.Debug.WriteLine($"Updated absolute position: {whiteCirclePosition} from relative ({whiteCirclePositionRelative.Value.X:P1}, {whiteCirclePositionRelative.Value.Y:P1}) for display rect {displayRect}");
-                }
             }
         }
 
@@ -1590,9 +1140,28 @@ namespace TelescopeWatcher
             return new Rectangle(displayX, displayY, displayWidth, displayHeight);
         }
 
-        #endregion
+        private void PictureBox2_Paint(object? sender, PaintEventArgs e)
+        {
+            if (whiteCirclePosition.HasValue)
+            {
+                using (Pen whitePen = new Pen(Color.White, 2))
+                {
+                    int x = whiteCirclePosition.Value.X - whiteCircleRadius;
+                    int y = whiteCirclePosition.Value.Y - whiteCircleRadius;
+                    e.Graphics.DrawEllipse(whitePen, x, y, whiteCircleRadius * 2, whiteCircleRadius * 2);
+                }
+            }
 
-        #region Camera Control Methods
+            if (isAddingCircle)
+            {
+                using (Pen redPen = new Pen(Color.Red, 2))
+                {
+                    int x = currentMousePosition.X - circleRadius;
+                    int y = currentMousePosition.Y - circleRadius;
+                    e.Graphics.DrawEllipse(redPen, x, y, circleRadius * 2, circleRadius * 2);
+                }
+            }
+        }
 
         private void BtnMainCameraControl_Click(object? sender, EventArgs e)
         {
@@ -1636,6 +1205,83 @@ namespace TelescopeWatcher
             }
         }
 
-        #endregion
+        private void BtnCircleSizeIncrease_Click(object? sender, EventArgs e)
+        {
+            if (circleRadius < MAX_RADIUS)
+            {
+                circleRadius += 5;
+                lblCircleSize.Text = $"{circleRadius}";
+                pictureBox2.Invalidate();
+            }
+        }
+
+        private void BtnCircleSizeDecrease_Click(object? sender, EventArgs e)
+        {
+            if (circleRadius > MIN_RADIUS)
+            {
+                circleRadius -= 5;
+                lblCircleSize.Text = $"{circleRadius}";
+                pictureBox2.Invalidate();
+            }
+        }
+
+        private void BtnAddCircle_Click(object? sender, EventArgs e)
+        {
+            isAddingCircle = !isAddingCircle;
+            
+            if (isAddingCircle)
+            {
+                btnAddCircle.Text = "Stop Adding";
+                btnAddCircle.BackColor = System.Drawing.Color.DarkGreen;
+                
+                pictureBox2.MouseMove += PictureBox2_MouseMove;
+                pictureBox2.MouseClick += PictureBox2_MouseClick;
+                pictureBox2.Paint += PictureBox2_Paint;
+                pictureBox2.Invalidate();
+            }
+            else
+            {
+                btnAddCircle.Text = "Add Circle";
+                btnAddCircle.BackColor = System.Drawing.Color.DarkRed;
+                
+                pictureBox2.MouseMove -= PictureBox2_MouseMove;
+                pictureBox2.MouseClick -= PictureBox2_MouseClick;
+                pictureBox2.Invalidate();
+            }
+        }
+
+        private void PictureBox2_MouseMove(object? sender, MouseEventArgs e)
+        {
+            currentMousePosition = e.Location;
+            pictureBox2.Invalidate();
+        }
+
+        private void PictureBox2_MouseClick(object? sender, MouseEventArgs e)
+        {
+            if (isAddingCircle && e.Button == MouseButtons.Left)
+            {
+                Rectangle displayRect = GetImageDisplayRectangle(pictureBox2);
+                
+                if (displayRect.Width > 0 && displayRect.Height > 0)
+                {
+                    int imageX = e.Location.X - displayRect.X;
+                    int imageY = e.Location.Y - displayRect.Y;
+                    
+                    float relativeX = (float)imageX / displayRect.Width;
+                    float relativeY = (float)imageY / displayRect.Height;
+                    
+                    relativeX = Math.Max(0, Math.Min(1, relativeX));
+                    relativeY = Math.Max(0, Math.Min(1, relativeY));
+                    
+                    whiteCirclePositionRelative = new PointF(relativeX, relativeY);
+                    whiteCirclePosition = e.Location;
+                    whiteCircleRadius = circleRadius;
+                    
+                    SaveWhiteCirclePosition();
+                    pictureBox2.Invalidate();
+                    System.Diagnostics.Debug.WriteLine($"White circle placed at: {whiteCirclePosition} ({relativeX:P1}, {relativeY:P1}) in display rect {displayRect} with radius: {whiteCircleRadius}");
+                }
+            }
+        }
     }
 }
