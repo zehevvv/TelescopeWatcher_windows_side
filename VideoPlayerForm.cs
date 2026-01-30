@@ -682,8 +682,8 @@ namespace TelescopeWatcher
                 {
                     // Enable detailed logging and hardware acceleration
                     // --avcodec-hw=any attempts to use available Hardware Acceleration (DXVA2/D3D11 on Windows)
-                    // --rtsp-tcp force TCP for RTSP globally
-                    libVLC = new LibVLC("--verbose=2", "--avcodec-hw=any", "--rtsp-tcp");
+                    // Removed --rtsp-tcp to allow/force UDP usage (default behavior)
+                    libVLC = new LibVLC("--verbose=2", "--avcodec-hw=any");
                     libVLC.Log += (sender, e) => System.Diagnostics.Debug.WriteLine($"[LibVLC] {e.FormattedLog}");
 
                     var host = new Uri(serverBaseUrl).Host;
@@ -709,12 +709,13 @@ namespace TelescopeWatcher
                     var media = new Media(libVLC, rtspUrl, FromType.FromLocation);
                     
                     // Ultra Low latency options
-                    // Reduced cache to 150ms - good balance for TCP. 
-                    // Too low (<100) on TCP might cause jitter if network fluctuates.
+                    // UDP might need slightly less buffer than TCP if network is good, or more if jittery.
+                    // Keeping 300ms for stability.
                     media.AddOption(":network-caching=300"); 
                     media.AddOption(":clock-jitter=0");
                     media.AddOption(":clock-synchro=0");
-                    // media.AddOption(":rtsp-tcp"); // Removed local option, setting it globally in LibVLC ctor often works better
+                    // Force UDP by explicitly ensuring rtsp-tcp is not set (it's commented out or removed)
+                    // media.AddOption(":rtsp-tcp"); 
                     media.AddOption(":file-caching=0");
                     media.AddOption(":live-caching=0");
                     media.AddOption(":disc-caching=0");
