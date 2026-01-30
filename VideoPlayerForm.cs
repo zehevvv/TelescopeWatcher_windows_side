@@ -73,9 +73,11 @@ namespace TelescopeWatcher
         private string currentFocusDirection = "";
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
+        private System.Windows.Forms.Timer fpsTimer; // Added frame timer
         private int timeBetweenSteps = 10;
         private int focusSpeed = 9;
         private Action<string>? logCallback;
+        private int lastDisplayedPictures = 0; // For FPS calc
 
         public VideoPlayerForm(string serverUrl, SerialPort? port = null, SerialServerClient? client = null, 
                                int stepsPerSecond = 100, int focusMotorSpeed = 9, Action<string>? logCallback = null)
@@ -120,6 +122,12 @@ namespace TelescopeWatcher
             focusTimer = new System.Windows.Forms.Timer();
             focusTimer.Interval = 100;
             focusTimer.Tick += FocusTimer_Tick;
+
+            // Initialize FPS timer
+            fpsTimer = new System.Windows.Forms.Timer();
+            fpsTimer.Interval = 1000;
+            fpsTimer.Tick += FpsTimer_Tick;
+            fpsTimer.Start();
         }
 
         private void OnStepsPerSecondChanged(object? sender, EventArgs e)
@@ -672,8 +680,9 @@ namespace TelescopeWatcher
                 // Initialize LibVLC for Main Stream
                 try 
                 {
-                    // Enable detailed logging and TCP transport for RTSP stability
-                    libVLC = new LibVLC("--verbose=2");
+                    // Enable detailed logging and hardware acceleration
+                    // --avcodec-hw=any attempts to use available Hardware Acceleration (DXVA2/D3D11 on Windows)
+                    libVLC = new LibVLC("--verbose=2", "--avcodec-hw=any");
                     libVLC.Log += (sender, e) => System.Diagnostics.Debug.WriteLine($"[LibVLC] {e.FormattedLog}");
 
                     var host = new Uri(serverBaseUrl).Host;
@@ -695,11 +704,17 @@ namespace TelescopeWatcher
                     videoView1.MediaPlayer = mediaPlayer1;
 
                     var media = new Media(libVLC, rtspUrl, FromType.FromLocation);
-                    // Low latency options
-                    media.AddOption(":network-caching=300"); // Increased buffer for stability
+                    
+                    // Ultra Low latency options
+                    // Reduced cache to 150ms - good balance for TCP. 
+                    // Too low (<100) on TCP might cause jitter if network fluctuates.
+                    media.AddOption(":network-caching=150"); 
                     media.AddOption(":clock-jitter=0");
                     media.AddOption(":clock-synchro=0");
                     media.AddOption(":rtsp-tcp"); // Force TCP transport
+                    media.AddOption(":file-caching=0");
+                    media.AddOption(":live-caching=0");
+                    media.AddOption(":disc-caching=0");
                     
                     if (flipHorizontal && flipVertical) media.AddOption(":video-filter=transform{type=180}");
                     else if (flipHorizontal) media.AddOption(":video-filter=transform{type=hflip}");
@@ -901,7 +916,7 @@ namespace TelescopeWatcher
             
             if (streamId == 1)
             {
-                newText = "Main: RTSP Stream Playing";
+                newText = $"Main: RTSP Stream | FPS: {fps:F1}"; // Updated to show FPS
             }
             else
             {
@@ -920,6 +935,30 @@ namespace TelescopeWatcher
             }
         }
 
+        private void FpsTimer_Tick(object? sender, EventArgs e)
+        {
+            if (mediaPlayer1 != null && mediaPlayer1.IsPlaying && mediaPlayer1.Media != null)
+            {
+                var stats = mediaPlayer1.Media.Statistics;
+                // MediaStats is a struct, so we use it directly without .HasValue or .Value
+                int currentDisplayed = stats.DisplayedPictures;
+                int fps = currentDisplayed - lastDisplayedPictures;
+                // Handle wrap around or reset
+                if (fps < 0) fps = 0;
+                
+                lastDisplayedPictures = currentDisplayed;
+                
+                // Update label with current FPS for Stream 1
+                UpdateFrameInfo(0, fps, 1);
+                
+                // If we are getting 0 FPS while playing, log drop stats
+                if (fps < 5 && isStreaming)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Low FPS Warning] Displayed: {currentDisplayed}, Lost: {stats.LostPictures}, Decoded: {stats.DecodedVideo}");
+                }
+            }
+        }
+
         private void BtnClose_Click(object? sender, EventArgs e)
         {
             this.Close();
@@ -933,6 +972,8 @@ namespace TelescopeWatcher
             commandTimer?.Dispose();
             focusTimer?.Stop();
             focusTimer?.Dispose();
+            fpsTimer?.Stop();
+            fpsTimer?.Dispose();
         }
 
         private void StopStreaming()
