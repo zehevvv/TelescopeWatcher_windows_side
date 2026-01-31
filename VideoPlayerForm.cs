@@ -746,19 +746,15 @@ namespace TelescopeWatcher
         {
             try
             {
-                string url = "http://192.168.4.1:8080/control.htm";
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-                LogMessage($"Opening Main Camera control page: {url}");
+                var settingsForm = new CameraSettingsForm(serverBaseUrl, "hd");
+                settingsForm.Show();
+                LogMessage($"Opening Main Camera settings window");
             }
             catch (Exception ex)
             {
-                LogMessage($"Error opening Main Camera control page: {ex.Message}");
-                MessageBox.Show($"Failed to open camera control page:\n\n{ex.Message}",
-                    "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LogMessage($"Error opening Main Camera settings wndow: {ex.Message}");
+                MessageBox.Show($"Failed to open camera settings:\n\n{ex.Message}",
+                    "Settings Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -766,21 +762,15 @@ namespace TelescopeWatcher
         {
             try
             {
-                // Update to port 5002 for UC60 (MJPG) control
-                var host = new Uri(serverBaseUrl).Host;
-                string url = $"http://{host}:5002/control.htm";
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-                LogMessage($"Opening Secondary Camera control page: {url}");
+                var settingsForm = new CameraSettingsForm(serverBaseUrl, "uc60");
+                settingsForm.Show();
+                LogMessage($"Opening Secondary Camera settings window");
             }
             catch (Exception ex)
             {
-                LogMessage($"Error opening Secondary Camera control page: {ex.Message}");
-                MessageBox.Show($"Failed to open camera control page:\n\n{ex.Message}",
-                    "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LogMessage($"Error opening Secondary Camera settings window: {ex.Message}");
+                MessageBox.Show($"Failed to open camera settings:\n\n{ex.Message}",
+                    "Settings Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
