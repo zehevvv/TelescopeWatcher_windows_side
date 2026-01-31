@@ -2,8 +2,8 @@ using System.Net.Http;
 using System.Text;
 using System.IO.Ports;
 using System.Diagnostics;
-using LibVLCSharp.Shared;
-using LibVLCSharp.WinForms;
+using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Web.WebView2.Core;
 
 namespace TelescopeWatcher
 {
@@ -21,8 +21,7 @@ namespace TelescopeWatcher
         private bool flipHorizontal = true;
         private bool flipVertical = true;
 
-        private LibVLC? libVLC;
-        private MediaPlayer? mediaPlayer1;
+        private WebView2? webView;
         
         // Circle overlay fields
         private bool isAddingCircle = false;
@@ -87,6 +86,19 @@ namespace TelescopeWatcher
             settings.FocusSpeed = focusMotorSpeed;
 
             InitializeComponent();
+            
+            // Initialize WebView2
+            this.webView = new WebView2();
+            this.webView.Name = "webViewMain";
+            this.webView.Dock = DockStyle.Fill;
+            this.Controls.Add(this.webView);
+            
+            // Hide the old VideoView if it exists
+            if (this.Controls.ContainsKey("videoView1"))
+            {
+                this.Controls["videoView1"].Visible = false;
+            }
+
             this.FormClosing += VideoPlayerForm_FormClosing;
             LoadWhiteCirclePosition();
             
@@ -251,10 +263,13 @@ namespace TelescopeWatcher
 
         private void RadioStream_CheckedChanged(object? sender, EventArgs e)
         {
+            if (webView == null) return;
+
             if (radioMainOnly.Checked)
             {
-                videoView1.Visible = true;
-                videoView1.Dock = DockStyle.Fill;
+                webView.Visible = true;
+                webView.Dock = DockStyle.Fill;
+                webView.BringToFront();
                 pictureBox2.Visible = false;
                 pictureBox2.Dock = DockStyle.None;
                 lblFrameInfo1.Visible = true;
@@ -262,8 +277,8 @@ namespace TelescopeWatcher
             }
             else if (radioSecondaryOnly.Checked)
             {
-                videoView1.Visible = false;
-                videoView1.Dock = DockStyle.None;
+                webView.Visible = false;
+                webView.Dock = DockStyle.None;
                 pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Fill;
                 lblFrameInfo1.Visible = false;
@@ -271,17 +286,17 @@ namespace TelescopeWatcher
             }
             else if (radioBoth.Checked)
             {
-                videoView1.Visible = true;
-                videoView1.Dock = DockStyle.Fill;
+                webView.Visible = true;
+                webView.Dock = DockStyle.Fill;
                 pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Right;
-                // Note: LibVLC VideoView might fight for layout space if not careful.
+                // Note: WebView2 might fight for layout space if not careful.
                 // Dock Right for pictureBox2 gets priority, Fill fills remaining.
                 pictureBox2.Width = this.ClientSize.Width / 2;
                 
                 // Ensure pictureBox2 is docked first (Right) by sending it to back of Z-order
                 pictureBox2.SendToBack();
-                videoView1.BringToFront();
+                webView.BringToFront();
 
                 lblFrameInfo1.Visible = true;
                 lblFrameInfo2.Visible = true;
@@ -303,60 +318,26 @@ namespace TelescopeWatcher
             {
                 UpdateStatus("Connecting to streams...", System.Drawing.Color.DarkOrange);
                 
-                // Initialize LibVLC for Main Stream
+                // Initialize WebView2 for Main Stream
                 try 
                 {
-                    // Enable detailed logging and hardware acceleration
-                    // --avcodec-hw=any attempts to use available Hardware Acceleration (DXVA2/D3D11 on Windows)
-                    // Removed --rtsp-tcp to allow/force UDP usage (default behavior)
-                    libVLC = new LibVLC("--verbose=2", "--avcodec-hw=any");
-                    libVLC.Log += (sender, e) => System.Diagnostics.Debug.WriteLine($"[LibVLC] {e.FormattedLog}");
-
-                    var host = new Uri(serverBaseUrl).Host;
-                    // Ensure the port is handled correctly if customized, though here it is hardcoded to 8554
-                    var rtspUrl = $"rtsp://{host}:8554/cam";
-                    // Note: If using authentication, it should be rtsp://user:pass@host...
-                    
-                    System.Diagnostics.Debug.WriteLine($"Connecting to Main RTSP: {rtspUrl}");
-
-                    mediaPlayer1 = new MediaPlayer(libVLC);
-                    
-                    // Add event handlers for status tracking
-                    mediaPlayer1.EncounteredError += (s, args) => 
+                    if (webView != null)
                     {
-                        System.Diagnostics.Debug.WriteLine("[LibVLC] Error encountered");
-                        UpdateStatus("Main Stream Error", System.Drawing.Color.Red);
-                    };
-                    mediaPlayer1.Opening += (s, args) => System.Diagnostics.Debug.WriteLine("[LibVLC] Opening media");
-                    mediaPlayer1.Buffering += (s, args) => System.Diagnostics.Debug.WriteLine($"[LibVLC] Buffering: {args.Cache}%");
-
-                    videoView1.MediaPlayer = mediaPlayer1;
-
-                    var media = new Media(libVLC, rtspUrl, FromType.FromLocation);
-                    
-                    // Ultra Low latency options
-                    // UDP might need slightly less buffer than TCP if network is good, or more if jittery.
-                    // Keeping 300ms for stability.
-                    media.AddOption(":network-caching=300"); 
-                    media.AddOption(":clock-jitter=0");
-                    media.AddOption(":clock-synchro=0");
-                    // Force UDP by explicitly ensuring rtsp-tcp is not set (it's commented out or removed)
-                    // media.AddOption(":rtsp-tcp"); 
-                    media.AddOption(":file-caching=0");
-                    media.AddOption(":live-caching=0");
-                    media.AddOption(":disc-caching=0");
-                    
-                    if (flipHorizontal && flipVertical) media.AddOption(":video-filter=transform{type=180}");
-                    else if (flipHorizontal) media.AddOption(":video-filter=transform{type=hflip}");
-                    else if (flipVertical) media.AddOption(":video-filter=transform{type=vflip}");
-
-                    mediaPlayer1.Play(media);
-                    UpdateFrameInfo(0, 0, 1); // Reset text
+                        await webView.EnsureCoreWebView2Async();
+                        
+                        var host = new Uri(serverBaseUrl).Host;
+                        var webUrl = $"http://{host}:8889/cam";
+                        
+                        System.Diagnostics.Debug.WriteLine($"Connecting to Main Web Stream: {webUrl}");
+                        
+                        webView.Source = new Uri(webUrl);
+                        UpdateFrameInfo(0, 0, 1); // Reset text (FPS not available for web)
+                    }
                 }
                 catch (Exception ex)
                 {
-                     System.Diagnostics.Debug.WriteLine($"Failed to start LibVLC: {ex.Message}");
-                     MessageBox.Show($"Failed to initialize RTSP player: {ex.Message}", "RTSP Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                     System.Diagnostics.Debug.WriteLine($"Failed to start WebView2: {ex.Message}");
+                     MessageBox.Show($"Failed to initialize Web player: {ex.Message}. Ensure WebView2 Runtime is installed.", "Web Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
 
                 // Initialize MJPEG for Secondary Stream
@@ -437,47 +418,31 @@ namespace TelescopeWatcher
             
             if (streamId == 1)
             {
-                newText = $"Main: RTSP Stream | FPS: {fps:F1}"; // Updated to show FPS
+                newText = $"Main: WebRTC Stream"; // Removed FPS
             }
             else
             {
                 newText = $"Secondary: Frame {frames} | FPS: {fps:F1}";
             }
             
-            if (label.InvokeRequired)
+            if (label != null) // Check null
             {
-                label.Invoke(new Action<int, double, int>(UpdateFrameInfo), frames, fps, streamId);
-                return;
-            }
+                if (label.InvokeRequired)
+                {
+                    label.Invoke(new Action<int, double, int>(UpdateFrameInfo), frames, fps, streamId);
+                    return;
+                }
 
-            if (label.Text != newText)
-            {
-                label.Text = newText;
+                if (label.Text != newText)
+                {
+                    label.Text = newText;
+                }
             }
         }
 
         private void FpsTimer_Tick(object? sender, EventArgs e)
         {
-            if (mediaPlayer1 != null && mediaPlayer1.IsPlaying && mediaPlayer1.Media != null)
-            {
-                var stats = mediaPlayer1.Media.Statistics;
-                // MediaStats is a struct, so we use it directly without .HasValue or .Value
-                int currentDisplayed = stats.DisplayedPictures;
-                int fps = currentDisplayed - lastDisplayedPictures;
-                // Handle wrap around or reset
-                if (fps < 0) fps = 0;
-                
-                lastDisplayedPictures = currentDisplayed;
-                
-                // Update label with current FPS for Stream 1
-                UpdateFrameInfo(0, fps, 1);
-                
-                // If we are getting 0 FPS while playing, log drop stats
-                if (fps < 5 && isStreaming)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[Low FPS Warning] Displayed: {currentDisplayed}, Lost: {stats.LostPictures}, Decoded: {stats.DecodedVideo}");
-                }
-            }
+            // FPS logic for main stream is not available with WebView2
         }
 
         private void BtnClose_Click(object? sender, EventArgs e)
@@ -497,6 +462,7 @@ namespace TelescopeWatcher
             fpsTimer?.Dispose();
             
             mjpegClient?.Dispose();
+            webView?.Dispose();
         }
 
         private void StopStreaming()
@@ -504,18 +470,9 @@ namespace TelescopeWatcher
             isStreaming = false;
             mjpegClient?.StopStreaming();
 
-            // Stop and dispose LibVLC
-            if (mediaPlayer1 != null)
+            if (webView != null && webView.CoreWebView2 != null)
             {
-                mediaPlayer1.Stop();
-                mediaPlayer1.Dispose();
-                mediaPlayer1 = null;
-            }
-            
-            if (libVLC != null)
-            {
-                libVLC.Dispose();
-                libVLC = null;
+                webView.Source = new Uri("about:blank");
             }
 
             pictureBox2?.Image?.Dispose();
