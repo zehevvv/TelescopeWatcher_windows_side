@@ -86,18 +86,28 @@ namespace TelescopeWatcher
             settings.FocusSpeed = focusMotorSpeed;
 
             InitializeComponent();
+
+            // Reparent pictureBox2 to Form so it can share space with webView
+            if (pictureBox2 != null)
+            {
+                this.Controls.Add(pictureBox2); // Move from videoPanel to Form
+            }
+            
+            // Hide the old VideoView/Panel if it exists
+            if (this.videoPanel != null)
+            {
+                this.videoPanel.Visible = false;
+            }
+            if (this.Controls.ContainsKey("videoView1"))
+            {
+                this.Controls["videoView1"].Visible = false;
+            }
             
             // Initialize WebView2
             this.webView = new WebView2();
             this.webView.Name = "webViewMain";
             this.webView.Dock = DockStyle.Fill;
             this.Controls.Add(this.webView);
-            
-            // Hide the old VideoView if it exists
-            if (this.Controls.ContainsKey("videoView1"))
-            {
-                this.Controls["videoView1"].Visible = false;
-            }
 
             this.FormClosing += VideoPlayerForm_FormClosing;
             LoadWhiteCirclePosition();
@@ -265,41 +275,58 @@ namespace TelescopeWatcher
         {
             if (webView == null) return;
 
+            // Ensure Panels are sent to Back (Inner Z-Order) so they dock against the outer edges first
+            if (controlPanel != null) controlPanel.SendToBack();
+            if (telescopeControlPanel != null) telescopeControlPanel.SendToBack();
+            if (lblStatus != null) lblStatus.SendToBack();
+            if (btnClose != null) btnClose.SendToBack();
+            // Frame info labels should be at bottom too
+            if (lblFrameInfo1 != null) lblFrameInfo1.SendToBack();
+            if (lblFrameInfo2 != null) lblFrameInfo2.SendToBack();
+
             if (radioMainOnly.Checked)
             {
+                // Main Only: Web takes Fill
+                pictureBox2.Visible = false;
+                
                 webView.Visible = true;
                 webView.Dock = DockStyle.Fill;
-                webView.BringToFront();
-                pictureBox2.Visible = false;
-                pictureBox2.Dock = DockStyle.None;
-                lblFrameInfo1.Visible = true;
-                lblFrameInfo2.Visible = false;
+                webView.BringToFront(); // Front-most (after panels docked)
+                
+                if (lblFrameInfo1 != null) lblFrameInfo1.Visible = true;
+                if (lblFrameInfo2 != null) lblFrameInfo2.Visible = false;
             }
             else if (radioSecondaryOnly.Checked)
             {
+                // Secondary Only: PicBox takes Fill
                 webView.Visible = false;
-                webView.Dock = DockStyle.None;
+                
                 pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Fill;
-                lblFrameInfo1.Visible = false;
-                lblFrameInfo2.Visible = true;
+                pictureBox2.BringToFront(); // Front-most
+                
+                if (lblFrameInfo1 != null) lblFrameInfo1.Visible = false;
+                if (lblFrameInfo2 != null) lblFrameInfo2.Visible = true;
             }
             else if (radioBoth.Checked)
             {
-                webView.Visible = true;
-                webView.Dock = DockStyle.Fill;
-                pictureBox2.Visible = true;
-                pictureBox2.Dock = DockStyle.Right;
-                // Note: WebView2 might fight for layout space if not careful.
-                // Dock Right for pictureBox2 gets priority, Fill fills remaining.
-                pictureBox2.Width = this.ClientSize.Width / 2;
+                // Both: Split View
+                // Layout logic: Panels (Back) -> PicBox (Middle) -> Web (Front)
                 
-                // Ensure pictureBox2 is docked first (Right) by sending it to back of Z-order
-                pictureBox2.SendToBack();
-                webView.BringToFront();
+                webView.Visible = true;
+                pictureBox2.Visible = true;
+                
+                if (lblFrameInfo1 != null) lblFrameInfo1.Visible = true;
+                if (lblFrameInfo2 != null) lblFrameInfo2.Visible = true;
 
-                lblFrameInfo1.Visible = true;
-                lblFrameInfo2.Visible = true;
+                // 1. Setup PicBox (Middle Z-Order, docks Right effectively inside panels)
+                pictureBox2.Dock = DockStyle.Right;
+                pictureBox2.Width = this.ClientSize.Width / 2;
+                pictureBox2.BringToFront(); 
+
+                // 2. Setup Web (Top Z-Order, docks Fill remaining)
+                webView.Dock = DockStyle.Fill;
+                webView.BringToFront(); 
             }
             
             UpdateWhiteCircleAbsolutePosition();

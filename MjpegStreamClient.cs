@@ -61,51 +61,141 @@ namespace TelescopeWatcher
                     return;
                 }
 
-                Log($"Stream {streamId} - Connected successfully");
+                string boundary = null;
+                var contentType = response.Content.Headers.ContentType;
+                if (contentType != null && !string.IsNullOrEmpty(contentType.MediaType))
+                {
+                    if (contentType.MediaType.Contains("multipart"))
+                    {
+                        foreach (var param in contentType.Parameters)
+                        {
+                            if (param.Name == "boundary")
+                            {
+                                boundary = param.Value?.Trim('\"');
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // If no boundary found in header, assume typical mjpg-streamer boundary
+                if (string.IsNullOrEmpty(boundary))
+                {
+                    boundary = "--boundarydonotcross"; 
+                }
+                
+                // Ensure boundary starts with --
+                if (!boundary.StartsWith("--")) boundary = "--" + boundary;
+
+                Log($"Stream {streamId} - Connected. Boundary: {boundary}");
 
                 using var stream = await response.Content.ReadAsStreamAsync(token);
+                byte[] boundaryBytes = System.Text.Encoding.ASCII.GetBytes(boundary);
                 
-                byte[] buffer = new byte[4096]; // Increased buffer
-                List<byte> frameBuffer = new List<byte>();
-                
+                // Buffer for reading headers and fallback scanning
+                List<byte> buffer = new List<byte>();
+                byte[] readChunk = new byte[1024]; 
+
                 while (!token.IsCancellationRequested)
                 {
-                    int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, token);
-                    if (bytesRead == 0) break;
-
-                    for (int i = 0; i < bytesRead; i++)
+                    // 1. Read Headers
+                    string headers = "";
+                    while (true)
                     {
-                        frameBuffer.Add(buffer[i]);
+                        string? line = await ReadLineAsync(stream, token);
+                        if (line == null) return; // End of stream
+                        if (string.IsNullOrEmpty(line)) break; // End of headers
+                        headers += line + "\n";
+                    }
 
-                        if (frameBuffer.Count < 2) continue;
-                        
-                        int len = frameBuffer.Count;
-
-                        // Check for JPEG end marker 0xFF 0xD9
-                        if (frameBuffer[len - 2] == 0xFF && frameBuffer[len - 1] == 0xD9)
+                    // 2. Parse Content-Length
+                    int contentLength = -1;
+                    foreach(var line in headers.Split('\n'))
+                    {
+                        if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
                         {
-                            // Find Start Of Image 0xFF 0xD8
-                            int startIndex = -1;
-                            for (int j = 0; j < frameBuffer.Count - 1; j++)
+                            string val = line.Substring(15).Trim();
+                            if (int.TryParse(val, out int len))
                             {
-                                if (frameBuffer[j] == 0xFF && frameBuffer[j + 1] == 0xD8)
-                                {
-                                    startIndex = j;
-                                    break;
-                                }
+                                contentLength = len;
+                                break;
                             }
-                            
-                            if (startIndex >= 0)
-                            {
-                                ProcessFrame(frameBuffer, startIndex, streamId);
-                            }
-                            
-                            frameBuffer.Clear();
+                        }
+                    }
+
+                    if (contentLength > 0)
+                    {
+                        // 3a. Known Length: Read exact content
+                        byte[] frameData = new byte[contentLength];
+                        int totalRead = 0;
+                        while (totalRead < contentLength)
+                        {
+                            int read = await stream.ReadAsync(frameData, totalRead, contentLength - totalRead, token);
+                            if (read == 0) return;
+                            totalRead += read;
                         }
                         
-                        // Safety clear if buffer gets too large (no frame found)
-                        if (frameBuffer.Count > 1000000) frameBuffer.Clear();
+                        ProcessFrameBytes(frameData, streamId);
                     }
+                    else
+                    {
+                        // 3b. Unknown Length: Read until next boundary
+                        // This is slower but necessary if Content-Length is missing
+                        buffer.Clear();
+                        
+                        while (!token.IsCancellationRequested)
+                        {
+                            int read = await stream.ReadAsync(readChunk, 0, readChunk.Length, token);
+                            if (read == 0) return;
+
+                            for (int i = 0; i < read; i++)
+                            {
+                                buffer.Add(readChunk[i]);
+                                
+                                // Check for boundary based on last byte matching last boundary byte
+                                if (buffer.Count >= boundaryBytes.Length)
+                                {
+                                    if (buffer[buffer.Count - 1] == boundaryBytes[boundaryBytes.Length - 1])
+                                    {
+                                        // Potential match, check backwards
+                                        bool match = true;
+                                        for (int j = 0; j < boundaryBytes.Length; j++)
+                                        {
+                                            if (buffer[buffer.Count - 1 - j] != boundaryBytes[boundaryBytes.Length - 1 - j])
+                                            {
+                                                match = false;
+                                                break;
+                                            }
+                                        }
+
+                                        if (match)
+                                        {
+                                            // Found boundary!
+                                            // Extract frame data (everything before the boundary)
+                                            // Remove boundary from buffer
+                                            int frameSize = buffer.Count - boundaryBytes.Length;
+                                            
+                                            // There might be a CRLF before boundary, clean it up
+                                            if (frameSize > 0 && buffer[frameSize - 1] == '\n') frameSize--;
+                                            if (frameSize > 0 && buffer[frameSize - 1] == '\r') frameSize--;
+
+                                            if (frameSize > 0)
+                                            {
+                                                byte[] frameData = new byte[frameSize];
+                                                buffer.CopyTo(0, frameData, 0, frameSize);
+                                                ProcessFrameBytes(frameData, streamId);
+                                            }
+                                            
+                                            // Stop reading for this frame, next loop will read headers
+                                            goto NextFrame; 
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    NextFrame: continue;
                 }
             }
             catch (Exception ex)
@@ -115,24 +205,44 @@ namespace TelescopeWatcher
             }
         }
 
-        private void ProcessFrame(List<byte> frameBuffer, int startIndex, int streamId)
+        private async Task<string?> ReadLineAsync(Stream stream, CancellationToken token)
         {
-            try
+            List<byte> lineBytes = new List<byte>();
+            byte[] buffer = new byte[1];
+            while (true)
             {
-                int frameLength = frameBuffer.Count - startIndex;
-                byte[] jpegData = new byte[frameLength];
-                frameBuffer.CopyTo(startIndex, jpegData, 0, frameLength);
+                int read = await stream.ReadAsync(buffer, 0, 1, token);
+                if (read == 0) return null;
                 
-                using var ms = new MemoryStream(jpegData);
-                var image = Image.FromStream(ms);
+                if (buffer[0] == '\n')
+                {
+                    return System.Text.Encoding.ASCII.GetString(lineBytes.ToArray()).Trim();
+                }
+                else if (buffer[0] != '\r')
+                {
+                    lineBytes.Add(buffer[0]);
+                }
+            }
+        }
 
+        private void ProcessFrameBytes(byte[] jpegData, int streamId)
+        {
+             try
+            {
+                using var ms = new MemoryStream(jpegData);
+                // Validate it's a JPEG
+                if (jpegData.Length < 2 || jpegData[0] != 0xFF || jpegData[1] != 0xD8) return;
+
+                var image = Image.FromStream(ms);
+                
                 // Handle flipping
                 if (FlipHorizontal || FlipVertical)
                 {
-                    var bitmap = new Bitmap(image);
-                    if (FlipHorizontal && FlipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
-                    else if (FlipHorizontal) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
-                    else if (FlipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
+                     // ... existing flip logic ...
+                     var bitmap = new Bitmap(image);
+                     if (FlipHorizontal && FlipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
+                     else if (FlipHorizontal) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                     else if (FlipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
                     
                     FrameReceived?.Invoke(this, bitmap);
                     image.Dispose();
@@ -142,9 +252,9 @@ namespace TelescopeWatcher
                     FrameReceived?.Invoke(this, image);
                 }
             }
-            catch (Exception ex)
+            catch 
             {
-                Log($"Stream {streamId} - Error decoding: {ex.Message}");
+                // Ignore corrupt frames
             }
         }
 
