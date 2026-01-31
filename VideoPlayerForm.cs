@@ -50,7 +50,7 @@ namespace TelescopeWatcher
         private Action<string>? logCallback;
 
         public VideoPlayerForm(string serverUrl, SerialPort? port = null, SerialServerClient? client = null, 
-                               int stepsPerSecond = 100, int focusMotorSpeed = 9, Action<string>? logCallback = null)
+                               int stepsPerSecond = 1000, int focusMotorSpeed = 9, Action<string>? logCallback = null)
         {
             this.serverBaseUrl = serverUrl;
             
@@ -72,20 +72,24 @@ namespace TelescopeWatcher
             this.mjpegClient = new MjpegStreamClient();
             this.mjpegClient.FrameReceived += MjpegClient_FrameReceived;
             
-            // Use shared settings via Controller
+            InitializeComponent(); // Controls created here
+
+             // Use shared settings via Controller
             var settings = TelescopeSettings.Instance;
             telescopeController.TimeBetweenSteps = settings.TimeBetweenSteps;
             telescopeController.FocusSpeed = settings.FocusSpeed;
             
-            // Subscribe to settings changes
+            // Subscribe to settings changes AFTER InitializeComponent
             settings.StepsPerSecondChanged += OnStepsPerSecondChanged;
             settings.FocusSpeedChanged += OnFocusSpeedChanged;
             
-            // Initialize other fields (retaining defaults in case)
-            settings.StepsPerSecond = stepsPerSecond;
-            settings.FocusSpeed = focusMotorSpeed;
+            // Force default to 1000 and update trackbar/settings
+            settings.StepsPerSecond = 1000;
+            // Explicitly set trackbar value to match 1000 (Index 3)
+            // Indices: 0=3, 1=10, 2=100, 3=1000, 4=10000
+            if (trackBarStepsPerSecond != null) trackBarStepsPerSecond.Value = 3;
 
-            InitializeComponent();
+            settings.FocusSpeed = focusMotorSpeed;
 
             // Reparent pictureBox2 to Form so it can share space with webView
             if (pictureBox2 != null)
@@ -109,6 +113,24 @@ namespace TelescopeWatcher
             this.webView.Dock = DockStyle.Fill;
             this.Controls.Add(this.webView);
 
+            // FIX: Anchor controls to Top|Right so they stay on the right side
+            if (btnCircleSizeIncrease != null) btnCircleSizeIncrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            if (lblCircleSize != null) lblCircleSize.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            if (btnCircleSizeDecrease != null) btnCircleSizeDecrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            if (btnAddCircle != null) btnAddCircle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            
+            if (lblFocusSpeedValue != null) lblFocusSpeedValue.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            if (trackBarFocusSpeed != null) trackBarFocusSpeed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            if (lblFocusSpeed != null) lblFocusSpeed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+
+            // Initialize display labels
+            UpdateStepsPerSecondDisplay();
+            UpdateFocusSpeedDisplay();
+            
+            // Initial layout
+            PositionCircleControls();
+            PositionFocusControls();
+
             this.FormClosing += VideoPlayerForm_FormClosing;
             LoadWhiteCirclePosition();
             
@@ -125,6 +147,11 @@ namespace TelescopeWatcher
             fpsTimer.Interval = 1000;
             fpsTimer.Tick += FpsTimer_Tick;
             fpsTimer.Start();
+            
+            // Force layout update for split screen
+            VideoPlayerForm_Resize(this, EventArgs.Empty);
+            // Verify Z-order and docking state
+            if (radioBoth != null && radioBoth.Checked) RadioStream_CheckedChanged(radioBoth, EventArgs.Empty);
         }
 
         private void OnStepsPerSecondChanged(object? sender, EventArgs e)
@@ -267,8 +294,14 @@ namespace TelescopeWatcher
 
         private void VideoPlayerForm_Resize(object? sender, EventArgs e)
         {
+            if (radioBoth != null && radioBoth.Checked && pictureBox2 != null)
+            {
+                // Maintain 50% split on resize
+                pictureBox2.Width = this.ClientSize.Width / 2;
+            }
+            
             UpdateWhiteCircleAbsolutePosition();
-            pictureBox2.Invalidate();
+            if (pictureBox2 != null) pictureBox2.Invalidate();
         }
 
         private void RadioStream_CheckedChanged(object? sender, EventArgs e)
