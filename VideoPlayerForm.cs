@@ -224,45 +224,52 @@ namespace TelescopeWatcher
         {
             if (controlPanel == null) return;
             
-            int rightMargin = 10;
+            int rightMargin = 2; // Reduced from 10 to 2
             int yPos = 3;
             
             // Position from right to left: + button, label, - button, Add Circle button
-            btnCircleSizeIncrease.Location = new System.Drawing.Point(controlPanel.Width - rightMargin - btnCircleSizeIncrease.Width, yPos);
+            if (btnCircleSizeIncrease != null)
+                btnCircleSizeIncrease.Location = new System.Drawing.Point(controlPanel.Width - rightMargin - btnCircleSizeIncrease.Width, yPos);
             
-            lblCircleSize.Location = new System.Drawing.Point(btnCircleSizeIncrease.Left - 5 - lblCircleSize.Width, yPos + 5);
+            if (lblCircleSize != null && btnCircleSizeIncrease != null)
+                lblCircleSize.Location = new System.Drawing.Point(btnCircleSizeIncrease.Left - 2 - lblCircleSize.Width, yPos + 5);
             
-            btnCircleSizeDecrease.Location = new System.Drawing.Point(lblCircleSize.Left - 5 - btnCircleSizeDecrease.Width, yPos);
+            if (btnCircleSizeDecrease != null && lblCircleSize != null)
+                btnCircleSizeDecrease.Location = new System.Drawing.Point(lblCircleSize.Left - 2 - btnCircleSizeDecrease.Width, yPos);
             
-            btnAddCircle.Location = new System.Drawing.Point(btnCircleSizeDecrease.Left - 10 - btnAddCircle.Width, yPos + 2);
+            if (btnAddCircle != null && btnCircleSizeDecrease != null)
+                btnAddCircle.Location = new System.Drawing.Point(btnCircleSizeDecrease.Left - 5 - btnAddCircle.Width, yPos + 2);
         }
 
         private void PositionFocusControls()
         {
             if (telescopeControlPanel == null) return;
             
-            int rightMargin = 10;
+            int rightMargin = 2; // Reduced from 10 to 2
             int labelYPos = 10;
             int trackbarYPos = 30;
             int valueYPos = 35;
             
-            // Position focus speed value label from the right
-            lblFocusSpeedValue.Location = new System.Drawing.Point(
-                telescopeControlPanel.Width - rightMargin - lblFocusSpeedValue.PreferredWidth, 
-                valueYPos
-            );
+            // Position focus speed value label from the right (flushed)
+            if (lblFocusSpeedValue != null)
+                lblFocusSpeedValue.Location = new System.Drawing.Point(
+                    telescopeControlPanel.Width - rightMargin - lblFocusSpeedValue.PreferredWidth, 
+                    valueYPos
+                );
             
             // Position trackbar to the left of the value label
-            trackBarFocusSpeed.Location = new System.Drawing.Point(
-                lblFocusSpeedValue.Left - 10 - trackBarFocusSpeed.Width, 
-                trackbarYPos
-            );
+            if (trackBarFocusSpeed != null && lblFocusSpeedValue != null)
+                trackBarFocusSpeed.Location = new System.Drawing.Point(
+                    lblFocusSpeedValue.Left - 5 - trackBarFocusSpeed.Width, 
+                    trackbarYPos
+                );
             
             // Position the label above the trackbar
-            lblFocusSpeed.Location = new System.Drawing.Point(
-                trackBarFocusSpeed.Left, 
-                labelYPos
-            );
+            if (lblFocusSpeed != null && trackBarFocusSpeed != null)
+                lblFocusSpeed.Location = new System.Drawing.Point(
+                    trackBarFocusSpeed.Left, 
+                    labelYPos
+                );
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -299,6 +306,10 @@ namespace TelescopeWatcher
                 // Maintain 50% split on resize
                 pictureBox2.Width = this.ClientSize.Width / 2;
             }
+            
+            // Force re-layout of right-aligned controls
+            PositionCircleControls();
+            PositionFocusControls();
             
             UpdateWhiteCircleAbsolutePosition();
             if (pictureBox2 != null) pictureBox2.Invalidate();

@@ -229,6 +229,33 @@ namespace TelescopeWatcher
                 System.Diagnostics.Debug.WriteLine($"Error setting control: {ex.Message}");
             }
         }
+
+        private async void BtnSetDefault_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                lblStatus.Text = "Resetting controls to defaults...";
+                string url = $"{apiUrl}/cam/{cameraEndpoint}/reset_controls";
+                var response = await httpClient.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    lblStatus.Text = "Controls reset successfully";
+                    // Reload controls to reflect new default values
+                    await LoadControls();
+                }
+                else
+                {
+                    lblStatus.Text = "Failed to reset controls";
+                    MessageBox.Show("Failed to reset controls. Server returned " + response.StatusCode, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblStatus.Text = "Error resetting controls";
+                MessageBox.Show($"Error resetting controls: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
     }
 
     public class CameraControl
