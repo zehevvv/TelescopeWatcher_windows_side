@@ -20,6 +20,14 @@ namespace TelescopeWatcher
         
         // Dictionary to keep track of value labels for sliders
         private Dictionary<string, Label> valueLabels = new Dictionary<string, Label>();
+        
+        // Configuration fields
+        private List<CameraControl> cameraControls = new List<CameraControl>();
+        private Dictionary<string, object> originalValues = new Dictionary<string, object>();
+        private Dictionary<string, GroupBox> controlGroupBoxes = new Dictionary<string, GroupBox>();
+        private string currentFilePath = "";
+        private bool isDirty = false;
+        private bool isLoadingUI = false; // Flag to prevent dirty checks during load
 
         public CameraSettingsForm(string serverBaseUrl, string cameraEndpoint)
         {
@@ -57,6 +65,8 @@ namespace TelescopeWatcher
             lblStatus.Text = "Loading controls...";
             flowLayoutPanelControls.Controls.Clear();
             valueLabels.Clear();
+            controlGroupBoxes.Clear();
+            cameraControls.Clear();
 
             try
             {
@@ -70,11 +80,24 @@ namespace TelescopeWatcher
 
                 if (controls != null)
                 {
+                    cameraControls = controls;
+                    
+                    // Capture baseline
+                    originalValues.Clear();
+                    foreach (var c in cameraControls)
+                    {
+                        originalValues[c.Name] = c.Value;
+                    }
+                    
+                    isLoadingUI = true;
                     foreach (var control in controls)
                     {
                         AddControlToUI(control);
                     }
+                    isLoadingUI = false;
+                    
                     lblStatus.Text = $"Loaded {controls.Count} controls";
+                    UpdateFileLabel();
                 }
                 else
                 {
@@ -95,6 +118,8 @@ namespace TelescopeWatcher
             gb.Width = flowLayoutPanelControls.Width - 40; // Full width with some padding
             gb.Height = 70;
             
+            controlGroupBoxes[control.Name] = gb; // Store for updating color
+            
             // Layout logic based on type and min/max
             if (control.Min.HasValue && control.Max.HasValue)
             {
@@ -109,7 +134,9 @@ namespace TelescopeWatcher
                     chk.CheckedChanged += (s, e) => 
                     {
                         var cb = s as CheckBox;
-                        SendControlUpdate(cb.Tag.ToString(), cb.Checked ? "1" : "0");
+                        string val = cb.Checked ? "1" : "0";
+                        SendControlUpdate(cb.Tag.ToString(), val);
+                        CheckDirty(cb.Tag.ToString(), cb.Checked ? 1 : 0); // Check int value
                     };
                     gb.Controls.Add(chk);
                 }
@@ -146,6 +173,7 @@ namespace TelescopeWatcher
                             valueLabels[t.Tag.ToString()].Text = t.Value.ToString();
                         }
                         QueueControlUpdate(t.Tag.ToString(), t.Value.ToString());
+                        CheckDirty(t.Tag.ToString(), t.Value);
                     };
 
                     gb.Controls.Add(tb);
@@ -176,6 +204,7 @@ namespace TelescopeWatcher
                     foreach(Control c in parent.Controls) {
                         if (c is TextBox t && t.Tag.ToString() == name) {
                              SendControlUpdate(name, t.Text);
+                             CheckDirty(name, t.Text);
                              break;
                         }
                     }
@@ -254,6 +283,175 @@ namespace TelescopeWatcher
             {
                 lblStatus.Text = "Error resetting controls";
                 MessageBox.Show($"Error resetting controls: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CheckDirty(string name, object newValue)
+        {
+            if (isLoadingUI) return;
+
+            // Attempt to update the internal list model
+            var control = cameraControls.Find(c => c.Name == name);
+            if (control != null)
+            {
+                // Ensure type consistency if possible
+                if (newValue is int i) control.Value = i;
+                else if (newValue is string s) 
+                {
+                    // Try parse if original was int? No, stick to raw for now
+                     control.Value = newValue;
+                }
+                else control.Value = newValue;
+            }
+
+            if (originalValues.ContainsKey(name))
+            {
+                var original = originalValues[name];
+                bool isChanged = false;
+
+                // Simple comparison
+                string s1 = original?.ToString() ?? "";
+                string s2 = newValue?.ToString() ?? "";
+                if (s1 != s2) isChanged = true;
+
+                if (controlGroupBoxes.ContainsKey(name))
+                {
+                    var gb = controlGroupBoxes[name];
+                    if (isChanged)
+                    {
+                        gb.ForeColor = Color.Red;
+                    }
+                    else
+                    {
+                        gb.ForeColor = Color.Black; // Reset
+                    }
+                }
+            }
+            
+            // Check global dirty state
+            isDirty = CheckAllDirty();
+            UpdateFileLabel();
+        }
+
+        private bool CheckAllDirty()
+        {
+            foreach(var kvp in originalValues)
+            {
+                var control = cameraControls.Find(c => c.Name == kvp.Key);
+                if (control != null)
+                {
+                    string s1 = kvp.Value?.ToString() ?? "";
+                    string s2 = control.Value?.ToString() ?? "";
+                    if (s1 != s2) return true;
+                }
+            }
+            return false;
+        }
+
+        private void UpdateFileLabel()
+        {
+            string fileName = string.IsNullOrEmpty(currentFilePath) ? "No file loaded" : System.IO.Path.GetFileName(currentFilePath);
+            if (isDirty)
+            {
+                lblCurrentFile.Text = $"{fileName} *";
+                lblCurrentFile.ForeColor = Color.Red;
+            }
+            else
+            {
+                lblCurrentFile.Text = fileName;
+                lblCurrentFile.ForeColor = Color.Black;
+            }
+        }
+
+        private async void BtnSave_Click(object sender, EventArgs e)
+        {
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "JSON Files|*.json|All Files|*.*";
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        var options = new JsonSerializerOptions { WriteIndented = true };
+                        string json = JsonSerializer.Serialize(cameraControls, options);
+                        await System.IO.File.WriteAllTextAsync(sfd.FileName, json);
+                        
+                        currentFilePath = sfd.FileName;
+                        
+                        // Update baseline to current
+                        originalValues.Clear();
+                        foreach(var c in cameraControls)
+                        {
+                            originalValues[c.Name] = c.Value;
+                            if (controlGroupBoxes.ContainsKey(c.Name))
+                                controlGroupBoxes[c.Name].ForeColor = Color.Black;
+                        }
+                        
+                        isDirty = false;
+                        UpdateFileLabel();
+                        lblStatus.Text = "Configuration saved.";
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error saving file: " + ex.Message);
+                    }
+                }
+            }
+        }
+
+        private async void BtnLoad_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "JSON Files|*.json|All Files|*.*";
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        string json = await System.IO.File.ReadAllTextAsync(ofd.FileName);
+                        var loaded = JsonSerializer.Deserialize<List<CameraControl>>(json);
+                        
+                        if (loaded != null)
+                        {
+                            cameraControls = loaded;
+                            currentFilePath = ofd.FileName;
+                            
+                            // Apply to camera
+                            lblStatus.Text = "Applying settings...";
+                            foreach(var c in cameraControls)
+                            {
+                                // Send update to server (fire and forget or await?)
+                                // We better await to avoid flooding if many
+                                string val = c.Value?.ToString() ?? "";
+                                string url = $"{apiUrl}/cam/{cameraEndpoint}/set_control?name={c.Name}&value={val}";
+                                await httpClient.GetAsync(url); // Don't use SendControlUpdate wrapper to avoid UI flicker/spam logic
+                            }
+                            
+                            // Rebuild UI
+                            isLoadingUI = true;
+                            flowLayoutPanelControls.Controls.Clear();
+                            valueLabels.Clear();
+                            controlGroupBoxes.Clear();
+                            
+                            // Capture new baseline FROM FILE
+                            originalValues.Clear();
+                            foreach (var c in cameraControls)
+                            {
+                                originalValues[c.Name] = c.Value;
+                                AddControlToUI(c);
+                            }
+                            isLoadingUI = false;
+
+                            isDirty = false;
+                            UpdateFileLabel();
+                            lblStatus.Text = "Configuration loaded and applied.";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error loading file: " + ex.Message);
+                    }
+                }
             }
         }
     }
