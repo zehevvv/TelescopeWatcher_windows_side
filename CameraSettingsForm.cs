@@ -373,7 +373,15 @@ namespace TelescopeWatcher
                     try
                     {
                         var options = new JsonSerializerOptions { WriteIndented = true };
-                        string json = JsonSerializer.Serialize(cameraControls, options);
+                        
+                        // Create configuration object with camera name
+                        var config = new CameraConfiguration
+                        {
+                            CameraName = cameraEndpoint,
+                            Controls = cameraControls
+                        };
+                        
+                        string json = JsonSerializer.Serialize(config, options);
                         await System.IO.File.WriteAllTextAsync(sfd.FileName, json);
                         
                         currentFilePath = sfd.FileName;
@@ -409,22 +417,41 @@ namespace TelescopeWatcher
                     try
                     {
                         string json = await System.IO.File.ReadAllTextAsync(ofd.FileName);
-                        var loaded = JsonSerializer.Deserialize<List<CameraControl>>(json);
                         
-                        if (loaded != null)
+                        // Try deserialize as configuration object
+                        CameraConfiguration config = null;
+                        try 
                         {
-                            cameraControls = loaded;
+                            config = JsonSerializer.Deserialize<CameraConfiguration>(json, new JsonSerializerOptions 
+                            { 
+                                PropertyNameCaseInsensitive = true 
+                            });
+                        }
+                        catch
+                        {
+                            // Ignored - likely invalid format or legacy file
+                        }
+
+                        if (config != null && !string.IsNullOrEmpty(config.CameraName) && config.Controls != null)
+                        {
+                            // Validate camera name
+                            if (!string.Equals(config.CameraName, cameraEndpoint, StringComparison.OrdinalIgnoreCase))
+                            {
+                                MessageBox.Show($"This configuration file is for camera '{config.CameraName}', but you are currently configuring '{cameraEndpoint}'. Load cancelled to prevent applying incompatible settings.", 
+                                    "Camera Mismatch", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return;
+                            }
+                            
+                            cameraControls = config.Controls;
                             currentFilePath = ofd.FileName;
                             
                             // Apply to camera
                             lblStatus.Text = "Applying settings...";
                             foreach(var c in cameraControls)
                             {
-                                // Send update to server (fire and forget or await?)
-                                // We better await to avoid flooding if many
                                 string val = c.Value?.ToString() ?? "";
                                 string url = $"{apiUrl}/cam/{cameraEndpoint}/set_control?name={c.Name}&value={val}";
-                                await httpClient.GetAsync(url); // Don't use SendControlUpdate wrapper to avoid UI flicker/spam logic
+                                await httpClient.GetAsync(url);
                             }
                             
                             // Rebuild UI
@@ -445,6 +472,11 @@ namespace TelescopeWatcher
                             isDirty = false;
                             UpdateFileLabel();
                             lblStatus.Text = "Configuration loaded and applied.";
+                        }
+                        else
+                        {
+                            MessageBox.Show("Invalid configuration file format. The file must contain the camera identifier to ensure compatibility.", 
+                                "Invalid File", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                     catch (Exception ex)
@@ -478,5 +510,11 @@ namespace TelescopeWatcher
 
         [JsonPropertyName("value")]
         public object Value { get; set; }
+    }
+
+    public class CameraConfiguration
+    {
+        public string CameraName { get; set; }
+        public List<CameraControl> Controls { get; set; }
     }
 }
