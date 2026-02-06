@@ -54,6 +54,7 @@ namespace TelescopeWatcher
             this.trackBarFocusSpeed = new System.Windows.Forms.TrackBar();
             this.lblFocusSpeed = new System.Windows.Forms.Label();
             this.lblFocusSpeedValue = new System.Windows.Forms.Label();
+            this.btnSaveFrame = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.videoView1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             this.videoPanel.SuspendLayout();
@@ -315,11 +316,12 @@ namespace TelescopeWatcher
             this.telescopeControlPanel.Controls.Add(this.lblFocusSpeed);
             this.telescopeControlPanel.Controls.Add(this.trackBarFocusSpeed);
             this.telescopeControlPanel.Controls.Add(this.lblFocusSpeedValue);
+            this.telescopeControlPanel.Controls.Add(this.btnSaveFrame);
             this.telescopeControlPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.telescopeControlPanel.Height = 80;
             this.telescopeControlPanel.Name = "telescopeControlPanel";
             this.telescopeControlPanel.Padding = new System.Windows.Forms.Padding(10, 5, 10, 5);
-            this.telescopeControlPanel.Resize += new System.EventHandler((s, e) => PositionFocusControls());
+            this.telescopeControlPanel.Resize += new System.EventHandler((s, e) => { PositionFocusControls(); PositionSaveFrameButton(); });
             // 
             // trackBarStepsPerSecond
             // 
@@ -379,6 +381,21 @@ namespace TelescopeWatcher
             this.lblFocusSpeedValue.ForeColor = System.Drawing.Color.LightGreen;
             this.lblFocusSpeedValue.Name = "lblFocusSpeedValue";
             this.lblFocusSpeedValue.Text = "";
+            // 
+            // btnSaveFrame
+            // 
+            this.btnSaveFrame.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+            this.btnSaveFrame.AutoSize = true;
+            this.btnSaveFrame.BackColor = System.Drawing.Color.DimGray;
+            this.btnSaveFrame.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSaveFrame.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnSaveFrame.ForeColor = System.Drawing.Color.White;
+            this.btnSaveFrame.Location = new System.Drawing.Point(500, 35); // Initial pos, will be repositioned
+            this.btnSaveFrame.Name = "btnSaveFrame";
+            this.btnSaveFrame.Padding = new System.Windows.Forms.Padding(10, 2, 10, 2);
+            this.btnSaveFrame.Text = "Save Frame";
+            this.btnSaveFrame.UseVisualStyleBackColor = false;
+            this.btnSaveFrame.Click += new System.EventHandler(this.BtnSaveFrame_Click);
             // 
             // VideoPlayerForm
             // 
@@ -443,5 +460,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.TrackBar trackBarFocusSpeed;
         private System.Windows.Forms.Label lblFocusSpeed;
         private System.Windows.Forms.Label lblFocusSpeedValue;
+        private System.Windows.Forms.Button btnSaveFrame;
     }
 }

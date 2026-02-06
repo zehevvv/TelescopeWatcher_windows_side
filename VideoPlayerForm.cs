@@ -272,6 +272,18 @@ namespace TelescopeWatcher
                 );
         }
 
+        private void PositionSaveFrameButton()
+        {
+            if (telescopeControlPanel == null || btnSaveFrame == null) return;
+
+            // Center horizontally in the panel
+            int centerX = (telescopeControlPanel.Width - btnSaveFrame.Width) / 2;
+            // Center vertically or align with other controls? 
+            // Bottom line is roughly Y=35 (for trackbar value). Let's put button at Y=35 roughly.
+            // Designer set Y=35.
+            
+            btnSaveFrame.Location = new Point(centerX, 35);
+        }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             // WM_KEYDOWN = 0x100, WM_KEYUP = 0x101
@@ -310,6 +322,7 @@ namespace TelescopeWatcher
             // Force re-layout of right-aligned controls
             PositionCircleControls();
             PositionFocusControls();
+            PositionSaveFrameButton();
             
             UpdateWhiteCircleAbsolutePosition();
             if (pictureBox2 != null) pictureBox2.Invalidate();
@@ -921,6 +934,51 @@ namespace TelescopeWatcher
                     pictureBox2.Invalidate();
                     System.Diagnostics.Debug.WriteLine($"White circle placed at: {whiteCirclePosition} ({relativeX:P1}, {relativeY:P1}) in display rect {displayRect} with radius: {whiteCircleRadius}");
                 }
+            }
+        }
+
+        private async void BtnSaveFrame_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (webView != null && webView.CoreWebView2 != null)
+                {
+                    using (SaveFileDialog sfd = new SaveFileDialog())
+                    {
+                        sfd.Filter = "PNG Image|*.png|JPEG Image|*.jpg";
+                        sfd.Title = "Save Current Main Camera Frame";
+                        sfd.FileName = $"MainCamera_Frame_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                        
+                        if (sfd.ShowDialog() == DialogResult.OK)
+                        {
+                            var format = sfd.FileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) 
+                                ? CoreWebView2CapturePreviewImageFormat.Jpeg 
+                                : CoreWebView2CapturePreviewImageFormat.Png;
+
+                            // CapturePreviewAsync writes to a stream
+                            using (var fileStream = System.IO.File.Create(sfd.FileName))
+                            {
+                                await webView.CoreWebView2.CapturePreviewAsync(format, fileStream);
+                            }
+                            
+                            LogMessage($"Frame saved to {sfd.FileName}");
+                            UpdateStatus("Frame saved to file", System.Drawing.Color.DarkGreen);
+                            
+                            // Visual feedback (brief flash or status reset delay)
+                            await Task.Delay(2000);
+                            UpdateStatus("Streams connected", System.Drawing.Color.DarkGreen);
+                        }
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Main camera stream is not ready.", "Capture Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error capturing frame: {ex.Message}");
+                MessageBox.Show($"Failed to save frame: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
