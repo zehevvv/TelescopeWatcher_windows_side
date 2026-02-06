@@ -409,13 +409,47 @@ namespace TelescopeWatcher
                     {
                         await webView.EnsureCoreWebView2Async();
                         
+                        // Hook message received for FPS
+                        webView.CoreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
+                        webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+                        
+                        // Inject FPS counter script
+                        string fpsScript = @"
+(function() {
+    if (window._fpsInterval) clearInterval(window._fpsInterval);
+    let lastFrames = 0;
+    let lastTime = performance.now();
+    window._fpsInterval = setInterval(() => {
+        const vid = document.querySelector('video');
+        if (vid) {
+            const q = vid.getVideoPlaybackQuality ? vid.getVideoPlaybackQuality() : null;
+            const currentFrames = q ? q.totalVideoFrames : (vid.webkitDecodedFrameCount || 0);
+            const now = performance.now();
+            if (lastFrames !== 0) {
+                const dt = (now - lastTime) / 1000;
+                if (dt > 0.5) { 
+                    const df = currentFrames - lastFrames;
+                    const fps = df / dt;
+                    window.chrome.webview.postMessage(JSON.stringify({ type: 'fps', value: fps }));
+                    lastFrames = currentFrames;
+                    lastTime = now;
+                }
+            } else {
+                lastFrames = currentFrames;
+                lastTime = now;9
+            }
+        }
+    }, 1000);
+})();";
+                        await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(fpsScript);
+                        
                         var host = new Uri(serverBaseUrl).Host;
                         var webUrl = $"http://{host}:8889/cam";
                         
                         System.Diagnostics.Debug.WriteLine($"Connecting to Main Web Stream: {webUrl}");
                         
                         webView.Source = new Uri(webUrl);
-                        UpdateFrameInfo(0, 0, 1); // Reset text (FPS not available for web)
+                        UpdateFrameInfo(0, 0, 1); // Reset text
                     }
                 }
                 catch (Exception ex)
@@ -502,7 +536,7 @@ namespace TelescopeWatcher
             
             if (streamId == 1)
             {
-                newText = $"Main: WebRTC Stream"; // Removed FPS
+                newText = $"Main: WebRTC Stream | FPS: {fps:F1}"; // Now showing FPS
             }
             else
             {
@@ -981,5 +1015,34 @@ namespace TelescopeWatcher
                 MessageBox.Show($"Failed to save frame: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            try
+            {
+                string json = e.TryGetWebMessageAsString();
+                if (!string.IsNullOrEmpty(json))
+                {
+                    var data = System.Text.Json.JsonSerializer.Deserialize<VideoMessage>(json);
+                    if (data != null && data.Type == "fps")
+                    {
+                        UpdateFrameInfo(0, data.Value, 1);
+                    }
+                }
+            }
+            catch
+            {
+                // Usage of message might vary, ignore parsing errors
+            }
+        }
+    }
+    
+    public class VideoMessage
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("type")]
+        public string Type { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("value")]
+        public double Value { get; set; }
     }
 }
