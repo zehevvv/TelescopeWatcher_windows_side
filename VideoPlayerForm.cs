@@ -274,15 +274,17 @@ namespace TelescopeWatcher
 
         private void PositionSaveFrameButton()
         {
-            if (telescopeControlPanel == null || btnSaveFrame == null) return;
+            if (telescopeControlPanel == null || btnSaveFrame == null || btnCalibration == null) return;
 
-            // Center horizontally in the panel
-            int centerX = (telescopeControlPanel.Width - btnSaveFrame.Width) / 2;
-            // Center vertically or align with other controls? 
-            // Bottom line is roughly Y=35 (for trackbar value). Let's put button at Y=35 roughly.
-            // Designer set Y=35.
+            // Center both buttons group horizontally
+            // Gap between buttons
+            int gap = 10;
+            int totalWidth = btnSaveFrame.Width + gap + btnCalibration.Width;
             
-            btnSaveFrame.Location = new Point(centerX, 35);
+            int startX = (telescopeControlPanel.Width - totalWidth) / 2;
+            
+            btnSaveFrame.Location = new Point(startX, 35);
+            btnCalibration.Location = new Point(startX + btnSaveFrame.Width + gap, 35);
         }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
@@ -1095,6 +1097,19 @@ namespace TelescopeWatcher
                 { 
                     if (this.IsHandleCreated) this.Invoke(new Action(ApplyVideoTransform)); 
                 });
+            }
+        }
+
+        private void BtnCalibration_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var form = new CalibrationForm(serverBaseUrl);
+                form.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening calibration: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

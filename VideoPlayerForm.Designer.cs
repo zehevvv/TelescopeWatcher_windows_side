@@ -55,6 +55,7 @@ namespace TelescopeWatcher
             this.lblFocusSpeed = new System.Windows.Forms.Label();
             this.lblFocusSpeedValue = new System.Windows.Forms.Label();
             this.btnSaveFrame = new System.Windows.Forms.Button();
+            this.btnCalibration = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.videoView1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             this.videoPanel.SuspendLayout();
@@ -317,6 +318,7 @@ namespace TelescopeWatcher
             this.telescopeControlPanel.Controls.Add(this.trackBarFocusSpeed);
             this.telescopeControlPanel.Controls.Add(this.lblFocusSpeedValue);
             this.telescopeControlPanel.Controls.Add(this.btnSaveFrame);
+            this.telescopeControlPanel.Controls.Add(this.btnCalibration);
             this.telescopeControlPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.telescopeControlPanel.Height = 80;
             this.telescopeControlPanel.Name = "telescopeControlPanel";
@@ -397,6 +399,21 @@ namespace TelescopeWatcher
             this.btnSaveFrame.UseVisualStyleBackColor = false;
             this.btnSaveFrame.Click += new System.EventHandler(this.BtnSaveFrame_Click);
             // 
+            // btnCalibration
+            // 
+            this.btnCalibration.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+            this.btnCalibration.AutoSize = true;
+            this.btnCalibration.BackColor = System.Drawing.Color.DimGray;
+            this.btnCalibration.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCalibration.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnCalibration.ForeColor = System.Drawing.Color.White;
+            this.btnCalibration.Location = new System.Drawing.Point(620, 35); // Initial pos to right of SaveFrame
+            this.btnCalibration.Name = "btnCalibration";
+            this.btnCalibration.Padding = new System.Windows.Forms.Padding(10, 2, 10, 2);
+            this.btnCalibration.Text = "Calibration";
+            this.btnCalibration.UseVisualStyleBackColor = false;
+            this.btnCalibration.Click += new System.EventHandler(this.BtnCalibration_Click);
+            // 
             // VideoPlayerForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -461,5 +478,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblFocusSpeed;
         private System.Windows.Forms.Label lblFocusSpeedValue;
         private System.Windows.Forms.Button btnSaveFrame;
+        private System.Windows.Forms.Button btnCalibration;
     }
 }
