@@ -413,6 +413,10 @@ namespace TelescopeWatcher
                         webView.CoreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
                         webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
                         
+                        // Handle initial flip application on load
+                        webView.NavigationCompleted -= WebView_NavigationCompleted;
+                        webView.NavigationCompleted += WebView_NavigationCompleted;
+                        
                         // Inject FPS counter script
                         string fpsScript = @"
 (function() {
@@ -600,6 +604,7 @@ namespace TelescopeWatcher
         {
             flipHorizontal = chkFlipHorizontal.Checked;
             if (mjpegClient != null) mjpegClient.FlipHorizontal = flipHorizontal;
+            ApplyVideoTransform(); // Apply to WebView
             System.Diagnostics.Debug.WriteLine($"Flip Horizontal: {flipHorizontal}");
         }
 
@@ -607,7 +612,46 @@ namespace TelescopeWatcher
         {
             flipVertical = chkFlipVertical.Checked;
             if (mjpegClient != null) mjpegClient.FlipVertical = flipVertical;
+            ApplyVideoTransform(); // Apply to WebView
             System.Diagnostics.Debug.WriteLine($"Flip Vertical: {flipVertical}");
+        }
+
+        private async void ApplyVideoTransform()
+        {
+            if (webView != null && webView.CoreWebView2 != null)
+            {
+                int scaleX = flipHorizontal ? -1 : 1;
+                int scaleY = flipVertical ? -1 : 1;
+                
+                // Robust script:
+                // 1. Sets global target scales.
+                // 2. Starts a singleton interval that constantly re-applies transform to ALL video elements.
+                // 3. This handles dynamic element creation/replacement by the camera web app.
+                string script = $@"
+                    (function() {{
+                        window._targetScaleX = {scaleX};
+                        window._targetScaleY = {scaleY};
+
+                        if (!window._flipEnforcer) {{
+                            window._flipEnforcer = setInterval(() => {{
+                                const vids = document.querySelectorAll('video');
+                                vids.forEach(v => {{
+                                    v.style.transform = 'scale(' + window._targetScaleX + ', ' + window._targetScaleY + ')';
+                                    // optional: v.style.transformOrigin = 'center center';
+                                }});
+                            }}, 500);
+                        }}
+                    }})();";
+                
+                try
+                {
+                    await webView.CoreWebView2.ExecuteScriptAsync(script);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error applying transform: {ex.Message}");
+                }
+            }
         }
 
         #region Keyboard Control Methods
@@ -1033,6 +1077,24 @@ namespace TelescopeWatcher
             catch
             {
                 // Usage of message might vary, ignore parsing errors
+            }
+        }
+
+        private void WebView_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+        {
+            if (e.IsSuccess)
+            {
+                // Apply transform once loaded. 
+                // Delay slightly to ensure <video> element exists? 
+                // Or rely on the FPS timer script to re-apply if we update it there? 
+                // Simple attempt immediately:
+                ApplyVideoTransform();
+                
+                // Backup: Retry after 1s just in case video element was created dynamically
+                Task.Delay(1000).ContinueWith(t => 
+                { 
+                    if (this.IsHandleCreated) this.Invoke(new Action(ApplyVideoTransform)); 
+                });
             }
         }
     }
