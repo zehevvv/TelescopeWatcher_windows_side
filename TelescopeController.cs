@@ -23,28 +23,8 @@ namespace TelescopeWatcher
         public void SendMoveCommand(string direction)
         {
             if (!IsConnected())
-            {5
-
-
-
-
-
-
-
-
-
-
-
-
-                    07                                                                                                                                                                                                                                  21                                                     41-++
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++300LogMessage("0Error: Connection not available!");
+            {
+                LogMessage("Error: Connection not available!");
                 return;
             }
 

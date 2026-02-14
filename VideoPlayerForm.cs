@@ -52,6 +52,19 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Timer fpsTimer; // Added frame timer
         private int lastDisplayedPictures = 0; // For FPS calc
 
+        // New flags to drop frames if UI is busy
+        // private volatile bool isUpdating1 = false; // Removed
+        // private volatile bool isUpdating2 = false; // Removed
+
+        // Latest Frame Synchronization
+        private readonly object _lock1 = new object();
+        private Image? _pendingFrame1 = null;
+        private bool _updatePending1 = false;
+
+        private readonly object _lock2 = new object();
+        private Image? _pendingFrame2 = null;
+        private bool _updatePending2 = false;
+
         private Action<string>? logCallback;
 
         public VideoPlayerForm(string serverUrl, SerialPort? port = null, SerialServerClient? client = null, 
@@ -433,40 +446,152 @@ namespace TelescopeWatcher
 
         private void MjpegClient1_FrameReceived(object? sender, Image image)
         {
-            UpdateImage(image, 1);
-            
-            frameCount1++;
-            var now = DateTime.Now;
-            var elapsed = (now - lastFrameTime1).TotalSeconds;
-            if (elapsed > 0)
+            // Always overwrite pending frame to ensure latest is used
+            lock(_lock1)
             {
-                double fps = 1.0 / elapsed;
-                if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
+                if (_pendingFrame1 != null)
                 {
-                    UpdateFrameInfo(frameCount1, fps, 1);
-                    lastFpsUpdate1 = now;
+                    _pendingFrame1.Dispose(); // Discard previous pending frame
+                }
+                _pendingFrame1 = image;
+
+                if (!_updatePending1)
+                {
+                    _updatePending1 = true;
+                    this.BeginInvoke(new Action(ProcessPendingFrame1));
                 }
             }
-            lastFrameTime1 = now;
+        }
+
+        private void ProcessPendingFrame1()
+        {
+            Image? frameToRender = null;
+            
+            lock (_lock1)
+            {
+                frameToRender = _pendingFrame1;
+                _pendingFrame1 = null;
+                
+                if (frameToRender == null)
+                {
+                    _updatePending1 = false;
+                    return;
+                }
+            }
+
+            try
+            {
+                UpdateImage(frameToRender, 1);
+                
+                frameCount1++;
+                var now = DateTime.Now;
+                var elapsed = (now - lastFrameTime1).TotalSeconds;
+                if (elapsed > 0)
+                {
+                    double fps = 1.0 / elapsed;
+                    if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
+                    {
+                        UpdateFrameInfo(frameCount1, fps, 1);
+                        lastFpsUpdate1 = now;
+                    }
+                }
+                lastFrameTime1 = now;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error rendering frame 1: {ex.Message}");
+            }
+            finally
+            {
+                // Check if more frames arrived while we were rendering
+                lock (_lock1)
+                {
+                    if (_pendingFrame1 != null)
+                    {
+                        // Schedule next update immediately
+                        this.BeginInvoke(new Action(ProcessPendingFrame1));
+                    }
+                    else
+                    {
+                        _updatePending1 = false;
+                    }
+                }
+            }
         }
 
         private void MjpegClient2_FrameReceived(object? sender, Image image)
         {
-            UpdateImage(image, 2);
-            
-            frameCount2++;
-            var now = DateTime.Now;
-            var elapsed = (now - lastFrameTime2).TotalSeconds;
-            if (elapsed > 0)
+             // Always overwrite pending frame to ensure latest is used
+            lock(_lock2)
             {
-                double fps = 1.0 / elapsed;
-                if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
+                if (_pendingFrame2 != null)
                 {
-                    UpdateFrameInfo(frameCount2, fps, 2);
-                    lastFpsUpdate2 = now;
+                    _pendingFrame2.Dispose(); // Discard previous pending frame
+                }
+                _pendingFrame2 = image;
+
+                if (!_updatePending2)
+                {
+                    _updatePending2 = true;
+                    this.BeginInvoke(new Action(ProcessPendingFrame2));
                 }
             }
-            lastFrameTime2 = now;
+        }
+
+        private void ProcessPendingFrame2()
+        {
+            Image? frameToRender = null;
+            
+            lock (_lock2)
+            {
+                frameToRender = _pendingFrame2;
+                _pendingFrame2 = null;
+                
+                if (frameToRender == null)
+                {
+                    _updatePending2 = false;
+                    return;
+                }
+            }
+
+            try
+            {
+                UpdateImage(frameToRender, 2);
+                
+                frameCount2++;
+                var now = DateTime.Now;
+                var elapsed = (now - lastFrameTime2).TotalSeconds;
+                if (elapsed > 0)
+                {
+                    double fps = 1.0 / elapsed;
+                    if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
+                    {
+                        UpdateFrameInfo(frameCount2, fps, 2);
+                        lastFpsUpdate2 = now;
+                    }
+                }
+                lastFrameTime2 = now;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error rendering frame 2: {ex.Message}");
+            }
+            finally
+            {
+                // Check if more frames arrived while we were rendering
+                lock (_lock2)
+                {
+                    if (_pendingFrame2 != null)
+                    {
+                        // Schedule next update immediately
+                        this.BeginInvoke(new Action(ProcessPendingFrame2));
+                    }
+                    else
+                    {
+                        _updatePending2 = false;
+                    }
+                }
+            }
         }
 
         // Renamed/Unified handler doesn't work well with event sig unless we wrap. 
@@ -475,14 +600,14 @@ namespace TelescopeWatcher
         private void UpdateImage(Image image, int streamId)
         {
             PictureBox? targetBox = streamId == 1 ? pictureBox1 : pictureBox2;
-            if (targetBox == null) return;
-
-            if (targetBox.InvokeRequired)
+            if (targetBox == null) 
             {
-                targetBox.Invoke(new Action<Image, int>(UpdateImage), image, streamId);
+                image.Dispose();
                 return;
             }
-
+            
+            // This method is now always called on UI thread via ProcessPendingFrame
+            
             var oldImage = targetBox.Image;
             bool wasFirstFrame = (oldImage == null);
             

@@ -89,12 +89,14 @@ namespace TelescopeWatcher
 
                 Log($"Stream {streamId} - Connected. Boundary: {boundary}");
 
-                using var stream = await response.Content.ReadAsStreamAsync(token);
+                using var networkStream = await response.Content.ReadAsStreamAsync(token);
+                using var stream = new BufferedStream(networkStream, 1024 * 64); // 64KB Buffer
+                
                 byte[] boundaryBytes = System.Text.Encoding.ASCII.GetBytes(boundary);
                 
                 // Buffer for reading headers and fallback scanning
                 List<byte> buffer = new List<byte>();
-                byte[] readChunk = new byte[1024]; 
+                byte[] readChunk = new byte[8192]; 
 
                 while (!token.IsCancellationRequested)
                 {
@@ -102,7 +104,7 @@ namespace TelescopeWatcher
                     string headers = "";
                     while (true)
                     {
-                        string? line = await ReadLineAsync(stream, token);
+                        string? line = ReadLine(stream); // Changed to blocking read from BufferedStream for speed
                         if (line == null) return; // End of stream
                         if (string.IsNullOrEmpty(line)) break; // End of headers
                         headers += line + "\n";
@@ -130,7 +132,8 @@ namespace TelescopeWatcher
                         int totalRead = 0;
                         while (totalRead < contentLength)
                         {
-                            int read = await stream.ReadAsync(frameData, totalRead, contentLength - totalRead, token);
+                            // Using blocking Read on BufferedStream is efficient and avoids async overhead for small chunks
+                            int read = stream.Read(frameData, totalRead, contentLength - totalRead);
                             if (read == 0) return;
                             totalRead += read;
                         }
@@ -140,12 +143,12 @@ namespace TelescopeWatcher
                     else
                     {
                         // 3b. Unknown Length: Read until next boundary
-                        // This is slower but necessary if Content-Length is missing
                         buffer.Clear();
                         
                         while (!token.IsCancellationRequested)
                         {
-                            int read = await stream.ReadAsync(readChunk, 0, readChunk.Length, token);
+                             // Read larger chunks
+                            int read = stream.Read(readChunk, 0, readChunk.Length);
                             if (read == 0) return;
 
                             for (int i = 0; i < read; i++)
@@ -205,22 +208,23 @@ namespace TelescopeWatcher
             }
         }
 
-        private async Task<string?> ReadLineAsync(Stream stream, CancellationToken token)
+        // Replaced async ReadLineAsync with sync ReadLine since we are in a Task.Run and using BufferedStream
+        private string? ReadLine(Stream stream)
         {
             List<byte> lineBytes = new List<byte>();
-            byte[] buffer = new byte[1];
+            int b;
             while (true)
             {
-                int read = await stream.ReadAsync(buffer, 0, 1, token);
-                if (read == 0) return null;
+                b = stream.ReadByte();
+                if (b == -1) return null;
                 
-                if (buffer[0] == '\n')
+                if (b == '\n')
                 {
                     return System.Text.Encoding.ASCII.GetString(lineBytes.ToArray()).Trim();
                 }
-                else if (buffer[0] != '\r')
+                else if (b != '\r')
                 {
-                    lineBytes.Add(buffer[0]);
+                    lineBytes.Add((byte)b);
                 }
             }
         }
