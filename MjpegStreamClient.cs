@@ -17,10 +17,14 @@ namespace TelescopeWatcher
         public bool FlipHorizontal { get; set; } = true;
         public bool FlipVertical { get; set; } = true;
 
+        private int _frameCount;
+        private long _fpsTimer = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+
         public MjpegStreamClient()
         {
             httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromMinutes(5);
+            httpClient.Timeout = TimeSpan.FromMinutes(5);            
         }
 
         public async Task StartStream(string mjpegUrl, int streamId)
@@ -106,7 +110,14 @@ namespace TelescopeWatcher
                     {
                         string? line = ReadLine(stream); // Changed to blocking read from BufferedStream for speed
                         if (line == null) return; // End of stream
-                        if (string.IsNullOrEmpty(line)) break; // End of headers
+
+                        // Skip empty lines that often appear between frames (e.g. trailing CRLF)
+                        if (string.IsNullOrEmpty(line))
+                        {
+                            if (headers.Length == 0) continue; 
+                            break; // End of headers block
+                        }
+
                         headers += line + "\n";
                     }
 
@@ -209,55 +220,70 @@ namespace TelescopeWatcher
         }
 
         // Replaced async ReadLineAsync with sync ReadLine since we are in a Task.Run and using BufferedStream
+        // Pre-allocated buffer to avoid repeated allocations
+        private readonly byte[] _lineBuffer = new byte[512];
+
         private string? ReadLine(Stream stream)
         {
-            List<byte> lineBytes = new List<byte>();
+            int index = 0;
             int b;
             while (true)
             {
                 b = stream.ReadByte();
                 if (b == -1) return null;
-                
+
                 if (b == '\n')
                 {
-                    return System.Text.Encoding.ASCII.GetString(lineBytes.ToArray()).Trim();
+                    return System.Text.Encoding.ASCII.GetString(_lineBuffer, 0, index).Trim();
                 }
-                else if (b != '\r')
+                else if (b != '\r' && index < _lineBuffer.Length)
                 {
-                    lineBytes.Add((byte)b);
+                    _lineBuffer[index++] = (byte)b;
                 }
             }
         }
 
+
+
+
         private void ProcessFrameBytes(byte[] jpegData, int streamId)
         {
-             try
-            {
-                using var ms = new MemoryStream(jpegData);
-                // Validate it's a JPEG
-                if (jpegData.Length < 2 || jpegData[0] != 0xFF || jpegData[1] != 0xD8) return;
 
-                var image = Image.FromStream(ms);
-                
-                // Handle flipping
-                if (FlipHorizontal || FlipVertical)
+            try
+            {
+                // Validate it's a JPEG
+                if (jpegData.Length < 2 || jpegData[0] != 0xFF || jpegData[1] != 0xD8)
                 {
-                     // ... existing flip logic ...
-                     var bitmap = new Bitmap(image);
-                     if (FlipHorizontal && FlipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
-                     else if (FlipHorizontal) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
-                     else if (FlipVertical) bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
-                    
-                    FrameReceived?.Invoke(this, bitmap);
-                    image.Dispose();
+                    Log($"it's not jpeg {jpegData[0]}, {jpegData[1]}");
+                    return;
                 }
-                else
+
+                using var ms = new MemoryStream(jpegData);
+
+                // Load directly as Bitmap to avoid double allocation when flipping
+                var bitmap = new Bitmap(ms);
+
+                // Handle flipping in-place (no copy needed)
+                if (FlipHorizontal && FlipVertical)
                 {
-                    FrameReceived?.Invoke(this, image);
+                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipXY);
                 }
+                else if (FlipHorizontal)
+                {
+                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                }
+                else if (FlipVertical)
+                {
+                    bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
+                }
+
+
+
+                FrameReceived?.Invoke(this, bitmap);
             }
             catch 
             {
+                Log("Corrupt image");
                 // Ignore corrupt frames
             }
         }

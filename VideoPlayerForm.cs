@@ -16,12 +16,12 @@ namespace TelescopeWatcher
         private CancellationTokenSource? cancellationToken;
         private Task? streamTask2;
         private bool isStreaming = false;
+        private int totalFrameCount1 = 0; // Added for FPS
+        private int totalFrameCount2 = 0;
         private int frameCount1 = 0; // Added for FPS
-        private int frameCount2 = 0;
-        private DateTime lastFrameTime1 = DateTime.Now; // Added
-        private DateTime lastFrameTime2 = DateTime.Now;
-        private DateTime lastFpsUpdate1 = DateTime.Now; // Added
-        private DateTime lastFpsUpdate2 = DateTime.Now;
+        private int frameCount2 = 0; // Added for FPS
+        private long lastFpsUpdate1 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        private long lastFpsUpdate2 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private bool flipHorizontal = true;
         private bool flipVertical = true;
 
@@ -482,20 +482,16 @@ namespace TelescopeWatcher
             try
             {
                 UpdateImage(frameToRender, 1);
-                
+
+                totalFrameCount1++;
                 frameCount1++;
-                var now = DateTime.Now;
-                var elapsed = (now - lastFrameTime1).TotalSeconds;
-                if (elapsed > 0)
+                var elapsed = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - lastFpsUpdate1;
+                if (elapsed >= 1000)
                 {
-                    double fps = 1.0 / elapsed;
-                    if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
-                    {
-                        UpdateFrameInfo(frameCount1, fps, 1);
-                        lastFpsUpdate1 = now;
-                    }
-                }
-                lastFrameTime1 = now;
+                    UpdateFrameInfo(totalFrameCount1, frameCount1, 1);
+                    lastFpsUpdate1 += 1000;
+                    frameCount1 = 0;
+                }                                
             }
             catch (Exception ex)
             {
@@ -519,9 +515,13 @@ namespace TelescopeWatcher
             }
         }
 
+        private int _frameCount;
+        private long _fpsTimer = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+
         private void MjpegClient2_FrameReceived(object? sender, Image image)
         {
-             // Always overwrite pending frame to ensure latest is used
+            // Always overwrite pending frame to ensure latest is used
             lock(_lock2)
             {
                 if (_pendingFrame2 != null)
@@ -557,20 +557,24 @@ namespace TelescopeWatcher
             try
             {
                 UpdateImage(frameToRender, 2);
-                
-                frameCount2++;
-                var now = DateTime.Now;
-                var elapsed = (now - lastFrameTime2).TotalSeconds;
-                if (elapsed > 0)
+
+                _frameCount++;
+                if (_fpsTimer <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
                 {
-                    double fps = 1.0 / elapsed;
-                    if ((now - lastFpsUpdate2).TotalMilliseconds >= 500)
-                    {
-                        UpdateFrameInfo(frameCount2, fps, 2);
-                        lastFpsUpdate2 = now;
-                    }
+                    System.Diagnostics.Debug.WriteLine($"video player 2 - FPS: {_frameCount}");
+                    _frameCount = 0;
+                    _fpsTimer += 1000;
                 }
-                lastFrameTime2 = now;
+
+                totalFrameCount2++;
+                frameCount2++;
+                var elapsed = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - lastFpsUpdate2;
+                if (elapsed >= 1000)
+                {
+                    UpdateFrameInfo(totalFrameCount2, frameCount2, 2);
+                    lastFpsUpdate2 += 1000;
+                    frameCount2 = 0;
+                }
             }
             catch (Exception ex)
             {
