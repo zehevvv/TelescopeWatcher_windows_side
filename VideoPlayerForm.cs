@@ -1,6 +1,6 @@
 using System.Net.Http;
 using System.Text;
-using System.IO.Ports;
+using System.IO.Ports; // Fixed from System.IO.Pials
 using System.Diagnostics;
 using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Core;
@@ -10,18 +10,22 @@ namespace TelescopeWatcher
     public partial class VideoPlayerForm : Form
     {
         private readonly string serverBaseUrl;
+        private readonly string mjpegUrl1; // Added
         private readonly string mjpegUrl2;
         private HttpClient? httpClient2;
         private CancellationTokenSource? cancellationToken;
         private Task? streamTask2;
         private bool isStreaming = false;
+        private int frameCount1 = 0; // Added for FPS
         private int frameCount2 = 0;
+        private DateTime lastFrameTime1 = DateTime.Now; // Added
         private DateTime lastFrameTime2 = DateTime.Now;
+        private DateTime lastFpsUpdate1 = DateTime.Now; // Added
         private DateTime lastFpsUpdate2 = DateTime.Now;
         private bool flipHorizontal = true;
         private bool flipVertical = true;
 
-        private WebView2? webView;
+        // private WebView2? webView; // Removed
         
         // Circle overlay fields
         private bool isAddingCircle = false;
@@ -35,7 +39,8 @@ namespace TelescopeWatcher
 
         // Telescope control fields
         private TelescopeController telescopeController;
-        private MjpegStreamClient mjpegClient;
+        private MjpegStreamClient mjpegClient1; // Added
+        private MjpegStreamClient mjpegClient2; // Renamed from mjpegClient
         
         // Removed separate connection fields managed by controller
         private bool isKeyPressed = false;
@@ -57,11 +62,14 @@ namespace TelescopeWatcher
             try
             {
                 var uri = new Uri(serverUrl);
+                // Assume Main on 5001, Secondary on 5002
+                this.mjpegUrl1 = $"{uri.Scheme}://{uri.Host}:5001/?action=stream";
                 this.mjpegUrl2 = $"{uri.Scheme}://{uri.Host}:5002/?action=stream";
             }
             catch
             {
-                // Fallback for raw IP or other formats
+                // Fallback
+                this.mjpegUrl1 = $"{serverUrl}:5001/?action=stream";
                 this.mjpegUrl2 = $"{serverUrl}:5002/?action=stream"; 
             }
             
@@ -69,8 +77,16 @@ namespace TelescopeWatcher
             
             // Initialize Helpers
             this.telescopeController = new TelescopeController(port, client, logCallback);
-            this.mjpegClient = new MjpegStreamClient();
-            this.mjpegClient.FrameReceived += MjpegClient_FrameReceived;
+            
+            this.mjpegClient1 = new MjpegStreamClient(); // Init client 1
+            this.mjpegClient1.FrameReceived += MjpegClient1_FrameReceived; // Specific handler
+            this.mjpegClient1.FlipHorizontal = flipHorizontal;
+            this.mjpegClient1.FlipVertical = flipVertical;
+
+            this.mjpegClient2 = new MjpegStreamClient(); // Init client 2
+            this.mjpegClient2.FrameReceived += MjpegClient2_FrameReceived; // Specific handler
+            this.mjpegClient2.FlipHorizontal = flipHorizontal;
+            this.mjpegClient2.FlipVertical = flipVertical;
             
             InitializeComponent(); // Controls created here
 
@@ -100,18 +116,10 @@ namespace TelescopeWatcher
             // Hide the old VideoView/Panel if it exists
             if (this.videoPanel != null)
             {
-                this.videoPanel.Visible = false;
+                this.videoPanel.Visible = true; // KEEP visible now as it holds PictureBoxes
             }
-            if (this.Controls.ContainsKey("videoView1"))
-            {
-                this.Controls["videoView1"].Visible = false;
-            }
-            
-            // Initialize WebView2
-            this.webView = new WebView2();
-            this.webView.Name = "webViewMain";
-            this.webView.Dock = DockStyle.Fill;
-            this.Controls.Add(this.webView);
+            // Initialize Display logic
+            // (Removed WebView init code)
 
             // FIX: Anchor controls to Top|Right so they stay on the right side
             if (btnCircleSizeIncrease != null) btnCircleSizeIncrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -276,8 +284,7 @@ namespace TelescopeWatcher
         {
             if (telescopeControlPanel == null || btnSaveFrame == null || btnCalibration == null) return;
 
-            // Center both buttons group horizontally
-            // Gap between buttons
+            // Center both buttons group horizontally with a gap
             int gap = 10;
             int totalWidth = btnSaveFrame.Width + gap + btnCalibration.Width;
             
@@ -321,48 +328,48 @@ namespace TelescopeWatcher
                 pictureBox2.Width = this.ClientSize.Width / 2;
             }
             
-            // Force re-layout of right-aligned controls
+            // Force re-layout
             PositionCircleControls();
             PositionFocusControls();
             PositionSaveFrameButton();
             
             UpdateWhiteCircleAbsolutePosition();
             if (pictureBox2 != null) pictureBox2.Invalidate();
+            if (pictureBox1 != null) pictureBox1.Invalidate();
         }
 
         private void RadioStream_CheckedChanged(object? sender, EventArgs e)
         {
-            if (webView == null) return;
-
-            // Ensure Panels are sent to Back (Inner Z-Order) so they dock against the outer edges first
+            // Ensure Panels are sent to Back
             if (controlPanel != null) controlPanel.SendToBack();
             if (telescopeControlPanel != null) telescopeControlPanel.SendToBack();
             if (lblStatus != null) lblStatus.SendToBack();
             if (btnClose != null) btnClose.SendToBack();
-            // Frame info labels should be at bottom too
             if (lblFrameInfo1 != null) lblFrameInfo1.SendToBack();
             if (lblFrameInfo2 != null) lblFrameInfo2.SendToBack();
 
+            if (pictureBox1 == null || pictureBox2 == null) return;
+
             if (radioMainOnly.Checked)
             {
-                // Main Only: Web takes Fill
+                // Main Only
                 pictureBox2.Visible = false;
                 
-                webView.Visible = true;
-                webView.Dock = DockStyle.Fill;
-                webView.BringToFront(); // Front-most (after panels docked)
+                pictureBox1.Visible = true;
+                pictureBox1.Dock = DockStyle.Fill;
+                pictureBox1.BringToFront(); 
                 
                 if (lblFrameInfo1 != null) lblFrameInfo1.Visible = true;
                 if (lblFrameInfo2 != null) lblFrameInfo2.Visible = false;
             }
             else if (radioSecondaryOnly.Checked)
             {
-                // Secondary Only: PicBox takes Fill
-                webView.Visible = false;
+                // Secondary Only
+                pictureBox1.Visible = false;
                 
                 pictureBox2.Visible = true;
                 pictureBox2.Dock = DockStyle.Fill;
-                pictureBox2.BringToFront(); // Front-most
+                pictureBox2.BringToFront(); 
                 
                 if (lblFrameInfo1 != null) lblFrameInfo1.Visible = false;
                 if (lblFrameInfo2 != null) lblFrameInfo2.Visible = true;
@@ -370,22 +377,20 @@ namespace TelescopeWatcher
             else if (radioBoth.Checked)
             {
                 // Both: Split View
-                // Layout logic: Panels (Back) -> PicBox (Middle) -> Web (Front)
-                
-                webView.Visible = true;
+                pictureBox1.Visible = true;
                 pictureBox2.Visible = true;
                 
                 if (lblFrameInfo1 != null) lblFrameInfo1.Visible = true;
                 if (lblFrameInfo2 != null) lblFrameInfo2.Visible = true;
 
-                // 1. Setup PicBox (Middle Z-Order, docks Right effectively inside panels)
+                // 1. Setup PicBox2 (Right)
                 pictureBox2.Dock = DockStyle.Right;
                 pictureBox2.Width = this.ClientSize.Width / 2;
                 pictureBox2.BringToFront(); 
 
-                // 2. Setup Web (Top Z-Order, docks Fill remaining)
-                webView.Dock = DockStyle.Fill;
-                webView.BringToFront(); 
+                // 2. Setup PicBox1 (Fill remaining)
+                pictureBox1.Dock = DockStyle.Fill;
+                pictureBox1.BringToFront(); 
             }
             
             UpdateWhiteCircleAbsolutePosition();
@@ -404,70 +409,17 @@ namespace TelescopeWatcher
             {
                 UpdateStatus("Connecting to streams...", System.Drawing.Color.DarkOrange);
                 
-                // Initialize WebView2 for Main Stream
-                try 
-                {
-                    if (webView != null)
-                    {
-                        await webView.EnsureCoreWebView2Async();
-                        
-                        // Hook message received for FPS
-                        webView.CoreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
-                        webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
-                        
-                        // Handle initial flip application on load
-                        webView.NavigationCompleted -= WebView_NavigationCompleted;
-                        webView.NavigationCompleted += WebView_NavigationCompleted;
-                        
-                        // Inject FPS counter script
-                        string fpsScript = @"
-(function() {
-    if (window._fpsInterval) clearInterval(window._fpsInterval);
-    let lastFrames = 0;
-    let lastTime = performance.now();
-    window._fpsInterval = setInterval(() => {
-        const vid = document.querySelector('video');
-        if (vid) {
-            const q = vid.getVideoPlaybackQuality ? vid.getVideoPlaybackQuality() : null;
-            const currentFrames = q ? q.totalVideoFrames : (vid.webkitDecodedFrameCount || 0);
-            const now = performance.now();
-            if (lastFrames !== 0) {
-                const dt = (now - lastTime) / 1000;
-                if (dt > 0.5) { 
-                    const df = currentFrames - lastFrames;
-                    const fps = df / dt;
-                    window.chrome.webview.postMessage(JSON.stringify({ type: 'fps', value: fps }));
-                    lastFrames = currentFrames;
-                    lastTime = now;
-                }
-            } else {
-                lastFrames = currentFrames;
-                lastTime = now;9
-            }
-        }
-    }, 1000);
-})();";
-                        await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(fpsScript);
-                        
-                        var host = new Uri(serverBaseUrl).Host;
-                        var webUrl = $"http://{host}:8889/cam";
-                        
-                        System.Diagnostics.Debug.WriteLine($"Connecting to Main Web Stream: {webUrl}");
-                        
-                        webView.Source = new Uri(webUrl);
-                        UpdateFrameInfo(0, 0, 1); // Reset text
-                    }
-                }
-                catch (Exception ex)
-                {
-                     System.Diagnostics.Debug.WriteLine($"Failed to start WebView2: {ex.Message}");
-                     MessageBox.Show($"Failed to initialize Web player: {ex.Message}. Ensure WebView2 Runtime is installed.", "Web Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                // Start Stream 1 (Main)
+                mjpegClient1.FlipHorizontal = flipHorizontal;
+                mjpegClient1.FlipVertical = flipVertical;
+                var task1 = mjpegClient1.StartStream(mjpegUrl1, 1);
 
-                // Initialize MJPEG for Secondary Stream
-                mjpegClient.FlipHorizontal = flipHorizontal;
-                mjpegClient.FlipVertical = flipVertical;
-                await mjpegClient.StartStream(mjpegUrl2, 2);
+                // Start Stream 2 (Secondary)
+                mjpegClient2.FlipHorizontal = flipHorizontal;
+                mjpegClient2.FlipVertical = flipVertical;
+                var task2 = mjpegClient2.StartStream(mjpegUrl2, 2);
+
+                await Task.WhenAll(task1, task2); // Wait for initialization logic if any (StartStream mostly async void/Task)
 
                 UpdateStatus("Streams connected", System.Drawing.Color.DarkGreen);
             }
@@ -479,11 +431,29 @@ namespace TelescopeWatcher
             }
         }
 
-        private void MjpegClient_FrameReceived(object? sender, Image image)
+        private void MjpegClient1_FrameReceived(object? sender, Image image)
+        {
+            UpdateImage(image, 1);
+            
+            frameCount1++;
+            var now = DateTime.Now;
+            var elapsed = (now - lastFrameTime1).TotalSeconds;
+            if (elapsed > 0)
+            {
+                double fps = 1.0 / elapsed;
+                if ((now - lastFpsUpdate1).TotalMilliseconds >= 500)
+                {
+                    UpdateFrameInfo(frameCount1, fps, 1);
+                    lastFpsUpdate1 = now;
+                }
+            }
+            lastFrameTime1 = now;
+        }
+
+        private void MjpegClient2_FrameReceived(object? sender, Image image)
         {
             UpdateImage(image, 2);
             
-            // FPS calculation logic for Mjpeg could be moved inside client too, but kept here for now
             frameCount2++;
             var now = DateTime.Now;
             var elapsed = (now - lastFrameTime2).TotalSeconds;
@@ -499,27 +469,30 @@ namespace TelescopeWatcher
             lastFrameTime2 = now;
         }
 
+        // Renamed/Unified handler doesn't work well with event sig unless we wrap. 
+        // Kept separate handlers above for simplicity.
+
         private void UpdateImage(Image image, int streamId)
         {
-            // Only for Stream 2 (Secondary)
-            if (streamId != 2) return;
-            
-            if (pictureBox2.InvokeRequired)
+            PictureBox? targetBox = streamId == 1 ? pictureBox1 : pictureBox2;
+            if (targetBox == null) return;
+
+            if (targetBox.InvokeRequired)
             {
-                pictureBox2.Invoke(new Action<Image, int>(UpdateImage), image, streamId);
+                targetBox.Invoke(new Action<Image, int>(UpdateImage), image, streamId);
                 return;
             }
 
-            var oldImage = pictureBox2.Image;
+            var oldImage = targetBox.Image;
             bool wasFirstFrame = (oldImage == null);
             
-            pictureBox2.Image = image;
+            targetBox.Image = image;
             oldImage?.Dispose();
             
-            if (wasFirstFrame && whiteCirclePositionRelative.HasValue)
+            if (wasFirstFrame && streamId == 2 && whiteCirclePositionRelative.HasValue) // Circles only on PicBox2 for now? Logic says PictureBox2_Paint usage.
             {
                 UpdateWhiteCircleAbsolutePosition();
-                pictureBox2.Invalidate();
+                targetBox.Invalidate();
             }
         }
 
@@ -542,7 +515,7 @@ namespace TelescopeWatcher
             
             if (streamId == 1)
             {
-                newText = $"Main: WebRTC Stream | FPS: {fps:F1}"; // Now showing FPS
+                newText = $"Main: Frame {frames} | FPS: {fps:F1}";
             }
             else
             {
@@ -585,74 +558,95 @@ namespace TelescopeWatcher
             fpsTimer?.Stop();
             fpsTimer?.Dispose();
             
-            mjpegClient?.Dispose();
-            webView?.Dispose();
+            mjpegClient1?.Dispose();
+            mjpegClient2?.Dispose();
+            // webView?.Dispose(); // Removed
         }
 
         private void StopStreaming()
         {
             isStreaming = false;
-            mjpegClient?.StopStreaming();
+            mjpegClient1?.StopStreaming();
+            mjpegClient2?.StopStreaming();
 
-            if (webView != null && webView.CoreWebView2 != null)
-            {
-                webView.Source = new Uri("about:blank");
-            }
-
+            pictureBox1?.Image?.Dispose();
             pictureBox2?.Image?.Dispose();
         }
 
         private void ChkFlipHorizontal_CheckedChanged(object? sender, EventArgs e)
         {
             flipHorizontal = chkFlipHorizontal.Checked;
-            if (mjpegClient != null) mjpegClient.FlipHorizontal = flipHorizontal;
-            ApplyVideoTransform(); // Apply to WebView
+            if (mjpegClient1 != null) mjpegClient1.FlipHorizontal = flipHorizontal;
+            if (mjpegClient2 != null) mjpegClient2.FlipHorizontal = flipHorizontal;
+            // ApplyVideoTransform(); // Removed WebView logic
             System.Diagnostics.Debug.WriteLine($"Flip Horizontal: {flipHorizontal}");
         }
 
         private void ChkFlipVertical_CheckedChanged(object? sender, EventArgs e)
         {
             flipVertical = chkFlipVertical.Checked;
-            if (mjpegClient != null) mjpegClient.FlipVertical = flipVertical;
-            ApplyVideoTransform(); // Apply to WebView
+            if (mjpegClient1 != null) mjpegClient1.FlipVertical = flipVertical;
+            if (mjpegClient2 != null) mjpegClient2.FlipVertical = flipVertical;
+            // ApplyVideoTransform(); // Removed WebView logic
             System.Diagnostics.Debug.WriteLine($"Flip Vertical: {flipVertical}");
         }
 
-        private async void ApplyVideoTransform()
-        {
-            if (webView != null && webView.CoreWebView2 != null)
-            {
-                int scaleX = flipHorizontal ? -1 : 1;
-                int scaleY = flipVertical ? -1 : 1;
-                
-                // Robust script:
-                // 1. Sets global target scales.
-                // 2. Starts a singleton interval that constantly re-applies transform to ALL video elements.
-                // 3. This handles dynamic element creation/replacement by the camera web app.
-                string script = $@"
-                    (function() {{
-                        window._targetScaleX = {scaleX};
-                        window._targetScaleY = {scaleY};
+        // Removed ApplyVideoTransform
+        // Removed CoreWebView2_WebMessageReceived
+        // Removed WebView_NavigationCompleted
+        // Removed VideoMessage class
 
-                        if (!window._flipEnforcer) {{
-                            window._flipEnforcer = setInterval(() => {{
-                                const vids = document.querySelectorAll('video');
-                                vids.forEach(v => {{
-                                    v.style.transform = 'scale(' + window._targetScaleX + ', ' + window._targetScaleY + ')';
-                                    // optional: v.style.transformOrigin = 'center center';
-                                }});
-                            }}, 500);
-                        }}
-                    }})();";
-                
-                try
+        private async void BtnSaveFrame_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (pictureBox1 != null && pictureBox1.Image != null)
                 {
-                    await webView.CoreWebView2.ExecuteScriptAsync(script);
+                    using (SaveFileDialog sfd = new SaveFileDialog())
+                    {
+                        sfd.Filter = "PNG Image|*.png|JPEG Image|*.jpg";
+                        sfd.Title = "Save Current Main Camera Frame";
+                        sfd.FileName = $"MainCamera_Frame_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                        
+                        if (sfd.ShowDialog() == DialogResult.OK)
+                        {
+                            var format = sfd.FileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) 
+                                ? System.Drawing.Imaging.ImageFormat.Jpeg 
+                                : System.Drawing.Imaging.ImageFormat.Png;
+
+                            // Save from PictureBox image
+                            pictureBox1.Image.Save(sfd.FileName, format);
+                            
+                            LogMessage($"Frame saved to {sfd.FileName}");
+                            UpdateStatus("Frame saved to file", System.Drawing.Color.DarkGreen);
+                            
+                            await Task.Delay(2000);
+                            UpdateStatus("Streams connected", System.Drawing.Color.DarkGreen);
+                        }
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error applying transform: {ex.Message}");
+                    MessageBox.Show("Main camera stream is not ready or has no image.", "Capture Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error capturing frame: {ex.Message}");
+                MessageBox.Show($"Failed to save frame: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnCalibration_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var form = new CalibrationForm(serverBaseUrl);
+                form.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening calibration: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1016,110 +1010,5 @@ namespace TelescopeWatcher
                 }
             }
         }
-
-        private async void BtnSaveFrame_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                if (webView != null && webView.CoreWebView2 != null)
-                {
-                    using (SaveFileDialog sfd = new SaveFileDialog())
-                    {
-                        sfd.Filter = "PNG Image|*.png|JPEG Image|*.jpg";
-                        sfd.Title = "Save Current Main Camera Frame";
-                        sfd.FileName = $"MainCamera_Frame_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-                        
-                        if (sfd.ShowDialog() == DialogResult.OK)
-                        {
-                            var format = sfd.FileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) 
-                                ? CoreWebView2CapturePreviewImageFormat.Jpeg 
-                                : CoreWebView2CapturePreviewImageFormat.Png;
-
-                            // CapturePreviewAsync writes to a stream
-                            using (var fileStream = System.IO.File.Create(sfd.FileName))
-                            {
-                                await webView.CoreWebView2.CapturePreviewAsync(format, fileStream);
-                            }
-                            
-                            LogMessage($"Frame saved to {sfd.FileName}");
-                            UpdateStatus("Frame saved to file", System.Drawing.Color.DarkGreen);
-                            
-                            // Visual feedback (brief flash or status reset delay)
-                            await Task.Delay(2000);
-                            UpdateStatus("Streams connected", System.Drawing.Color.DarkGreen);
-                        }
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("Main camera stream is not ready.", "Capture Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Error capturing frame: {ex.Message}");
-                MessageBox.Show($"Failed to save frame: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
-        {
-            try
-            {
-                string json = e.TryGetWebMessageAsString();
-                if (!string.IsNullOrEmpty(json))
-                {
-                    var data = System.Text.Json.JsonSerializer.Deserialize<VideoMessage>(json);
-                    if (data != null && data.Type == "fps")
-                    {
-                        UpdateFrameInfo(0, data.Value, 1);
-                    }
-                }
-            }
-            catch
-            {
-                // Usage of message might vary, ignore parsing errors
-            }
-        }
-
-        private void WebView_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
-        {
-            if (e.IsSuccess)
-            {
-                // Apply transform once loaded. 
-                // Delay slightly to ensure <video> element exists? 
-                // Or rely on the FPS timer script to re-apply if we update it there? 
-                // Simple attempt immediately:
-                ApplyVideoTransform();
-                
-                // Backup: Retry after 1s just in case video element was created dynamically
-                Task.Delay(1000).ContinueWith(t => 
-                { 
-                    if (this.IsHandleCreated) this.Invoke(new Action(ApplyVideoTransform)); 
-                });
-            }
-        }
-
-        private void BtnCalibration_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                var form = new CalibrationForm(serverBaseUrl);
-                form.ShowDialog(this);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error opening calibration: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-    }
-    
-    public class VideoMessage
-    {
-        [System.Text.Json.Serialization.JsonPropertyName("type")]
-        public string Type { get; set; }
-        
-        [System.Text.Json.Serialization.JsonPropertyName("value")]
-        public double Value { get; set; }
     }
 }

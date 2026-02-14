@@ -28,7 +28,7 @@ namespace TelescopeWatcher
         /// </summary>
         private void InitializeComponent()
         {
-            this.videoView1 = new LibVLCSharp.WinForms.VideoView();
+            this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.pictureBox2 = new System.Windows.Forms.PictureBox();
             this.videoPanel = new System.Windows.Forms.Panel();
             this.btnClose = new System.Windows.Forms.Button();
@@ -56,7 +56,7 @@ namespace TelescopeWatcher
             this.lblFocusSpeedValue = new System.Windows.Forms.Label();
             this.btnSaveFrame = new System.Windows.Forms.Button();
             this.btnCalibration = new System.Windows.Forms.Button();
-            ((System.ComponentModel.ISupportInitialize)(this.videoView1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             this.videoPanel.SuspendLayout();
             this.controlPanel.SuspendLayout();
@@ -65,13 +65,14 @@ namespace TelescopeWatcher
             ((System.ComponentModel.ISupportInitialize)(this.trackBarFocusSpeed)).BeginInit();
             this.SuspendLayout();
             // 
-            // videoView1
+            // pictureBox1
             // 
-            this.videoView1.BackColor = System.Drawing.Color.Black;
-            this.videoView1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.videoView1.MediaPlayer = null;
-            this.videoView1.Name = "videoView1";
-            this.videoView1.TabIndex = 0;
+            this.pictureBox1.BackColor = System.Drawing.Color.Black;
+            this.pictureBox1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pictureBox1.Name = "pictureBox1";
+            this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBox1.TabIndex = 0;
+            this.pictureBox1.TabStop = false;
             // 
             // pictureBox2
             // 
@@ -88,7 +89,7 @@ namespace TelescopeWatcher
             // videoPanel
             // 
             this.videoPanel.BackColor = System.Drawing.Color.Black;
-            this.videoPanel.Controls.Add(this.videoView1);
+            this.videoPanel.Controls.Add(this.pictureBox1);
             this.videoPanel.Controls.Add(this.pictureBox2);
             this.videoPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.videoPanel.Name = "videoPanel";
@@ -436,7 +437,7 @@ namespace TelescopeWatcher
             this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.VideoPlayerForm_KeyDown);
             this.KeyUp += new System.Windows.Forms.KeyEventHandler(this.VideoPlayerForm_KeyUp);
             this.Resize += new System.EventHandler(this.VideoPlayerForm_Resize);
-            ((System.ComponentModel.ISupportInitialize)(this.videoView1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).EndInit();
             this.videoPanel.ResumeLayout(false);
             this.controlPanel.ResumeLayout(false);
@@ -451,7 +452,7 @@ namespace TelescopeWatcher
 
         #endregion
 
-        private LibVLCSharp.WinForms.VideoView videoView1;
+        private System.Windows.Forms.PictureBox pictureBox1;
         private System.Windows.Forms.PictureBox pictureBox2;
         private System.Windows.Forms.Panel videoPanel;
         private System.Windows.Forms.Button btnClose;
