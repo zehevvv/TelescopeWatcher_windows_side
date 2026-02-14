@@ -511,10 +511,6 @@ namespace TelescopeWatcher
             }
         }
 
-        private int _frameCount;
-        private long _fpsTimer = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-
         private void MjpegClient2_FrameReceived(object? sender, Image image)
         {
             // Always overwrite pending frame to ensure latest is used
@@ -553,14 +549,6 @@ namespace TelescopeWatcher
             try
             {
                 UpdateImage(frameToRender, 2);
-
-                _frameCount++;
-                if (_fpsTimer <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-                {
-                    System.Diagnostics.Debug.WriteLine($"video player 2 - FPS: {_frameCount}");
-                    _frameCount = 0;
-                    _fpsTimer += 1000;
-                }
 
                 totalFrameCount2++;
                 frameCount2++;
