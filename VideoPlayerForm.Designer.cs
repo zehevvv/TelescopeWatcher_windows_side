@@ -28,6 +28,11 @@ namespace TelescopeWatcher
         /// </summary>
         private void InitializeComponent()
         {
+            this.menuStrip1 = new System.Windows.Forms.MenuStrip();
+            this.cameraSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.mainCameraToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.secondaryCameraToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.calibrationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.pictureBox2 = new System.Windows.Forms.PictureBox();
             this.videoPanel = new System.Windows.Forms.Panel();
@@ -45,8 +50,6 @@ namespace TelescopeWatcher
             this.btnCircleSizeIncrease = new System.Windows.Forms.Button();
             this.btnCircleSizeDecrease = new System.Windows.Forms.Button();
             this.lblCircleSize = new System.Windows.Forms.Label();
-            this.btnMainCameraControl = new System.Windows.Forms.Button();
-            this.btnSecondaryCameraControl = new System.Windows.Forms.Button();
             this.telescopeControlPanel = new System.Windows.Forms.Panel();
             this.trackBarStepsPerSecond = new System.Windows.Forms.TrackBar();
             this.lblStepsPerSecond = new System.Windows.Forms.Label();
@@ -55,7 +58,6 @@ namespace TelescopeWatcher
             this.lblFocusSpeed = new System.Windows.Forms.Label();
             this.lblFocusSpeedValue = new System.Windows.Forms.Label();
             this.btnSaveFrame = new System.Windows.Forms.Button();
-            this.btnCalibration = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             this.videoPanel.SuspendLayout();
@@ -63,7 +65,49 @@ namespace TelescopeWatcher
             this.telescopeControlPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarStepsPerSecond)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarFocusSpeed)).BeginInit();
+            this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
+            // 
+            // menuStrip1
+            // 
+            this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.cameraSettingsToolStripMenuItem});
+            this.menuStrip1.Location = new System.Drawing.Point(0, 0);
+            this.menuStrip1.Name = "menuStrip1";
+            this.menuStrip1.Size = new System.Drawing.Size(1200, 24);
+            this.menuStrip1.TabIndex = 6;
+            this.menuStrip1.Text = "menuStrip1";
+            // 
+            // cameraSettingsToolStripMenuItem
+            // 
+            this.cameraSettingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.mainCameraToolStripMenuItem,
+            this.secondaryCameraToolStripMenuItem,
+            this.calibrationToolStripMenuItem});
+            this.cameraSettingsToolStripMenuItem.Name = "cameraSettingsToolStripMenuItem";
+            this.cameraSettingsToolStripMenuItem.Size = new System.Drawing.Size(105, 20);
+            this.cameraSettingsToolStripMenuItem.Text = "Camera Settings";
+            // 
+            // mainCameraToolStripMenuItem
+            // 
+            this.mainCameraToolStripMenuItem.Name = "mainCameraToolStripMenuItem";
+            this.mainCameraToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.mainCameraToolStripMenuItem.Text = "Main Camera";
+            this.mainCameraToolStripMenuItem.Click += new System.EventHandler(this.BtnMainCameraControl_Click);
+            // 
+            // secondaryCameraToolStripMenuItem
+            // 
+            this.secondaryCameraToolStripMenuItem.Name = "secondaryCameraToolStripMenuItem";
+            this.secondaryCameraToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.secondaryCameraToolStripMenuItem.Text = "Secondary Camera";
+            this.secondaryCameraToolStripMenuItem.Click += new System.EventHandler(this.BtnSecondaryCameraControl_Click);
+            // 
+            // calibrationToolStripMenuItem
+            // 
+            this.calibrationToolStripMenuItem.Name = "calibrationToolStripMenuItem";
+            this.calibrationToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.calibrationToolStripMenuItem.Text = "Calibration";
+            this.calibrationToolStripMenuItem.Click += new System.EventHandler(this.BtnCalibration_Click);
             // 
             // pictureBox1
             // 
@@ -212,8 +256,6 @@ namespace TelescopeWatcher
             this.controlPanel.Controls.Add(this.radioBoth);
             this.controlPanel.Controls.Add(this.chkFlipHorizontal);
             this.controlPanel.Controls.Add(this.chkFlipVertical);
-            this.controlPanel.Controls.Add(this.btnMainCameraControl);
-            this.controlPanel.Controls.Add(this.btnSecondaryCameraControl);
             this.controlPanel.Controls.Add(this.btnAddCircle);
             this.controlPanel.Controls.Add(this.btnCircleSizeDecrease);
             this.controlPanel.Controls.Add(this.lblCircleSize);
@@ -279,36 +321,6 @@ namespace TelescopeWatcher
             this.lblCircleSize.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.lblCircleSize.Width = 40;
             // 
-            // btnMainCameraControl
-            // 
-            this.btnMainCameraControl.AutoSize = true;
-            this.btnMainCameraControl.BackColor = System.Drawing.Color.DarkBlue;
-            this.btnMainCameraControl.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMainCameraControl.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnMainCameraControl.ForeColor = System.Drawing.Color.White;
-            this.btnMainCameraControl.Location = new System.Drawing.Point(580, 5);
-            this.btnMainCameraControl.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
-            this.btnMainCameraControl.Name = "btnMainCameraControl";
-            this.btnMainCameraControl.Padding = new System.Windows.Forms.Padding(8, 2, 8, 2);
-            this.btnMainCameraControl.Text = "Main Cam Control";
-            this.btnMainCameraControl.UseVisualStyleBackColor = false;
-            this.btnMainCameraControl.Click += new System.EventHandler(this.BtnMainCameraControl_Click);
-            // 
-            // btnSecondaryCameraControl
-            // 
-            this.btnSecondaryCameraControl.AutoSize = true;
-            this.btnSecondaryCameraControl.BackColor = System.Drawing.Color.DarkBlue;
-            this.btnSecondaryCameraControl.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnSecondaryCameraControl.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnSecondaryCameraControl.ForeColor = System.Drawing.Color.White;
-            this.btnSecondaryCameraControl.Location = new System.Drawing.Point(730, 5);
-            this.btnSecondaryCameraControl.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
-            this.btnSecondaryCameraControl.Name = "btnSecondaryCameraControl";
-            this.btnSecondaryCameraControl.Padding = new System.Windows.Forms.Padding(8, 2, 8, 2);
-            this.btnSecondaryCameraControl.Text = "Sec Cam Control";
-            this.btnSecondaryCameraControl.UseVisualStyleBackColor = false;
-            this.btnSecondaryCameraControl.Click += new System.EventHandler(this.BtnSecondaryCameraControl_Click);
-            // 
             // telescopeControlPanel
             // 
             this.telescopeControlPanel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(45)))), ((int)(((byte)(45)))), ((int)(((byte)(48)))));
@@ -319,7 +331,6 @@ namespace TelescopeWatcher
             this.telescopeControlPanel.Controls.Add(this.trackBarFocusSpeed);
             this.telescopeControlPanel.Controls.Add(this.lblFocusSpeedValue);
             this.telescopeControlPanel.Controls.Add(this.btnSaveFrame);
-            this.telescopeControlPanel.Controls.Add(this.btnCalibration);
             this.telescopeControlPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.telescopeControlPanel.Height = 80;
             this.telescopeControlPanel.Name = "telescopeControlPanel";
@@ -400,21 +411,6 @@ namespace TelescopeWatcher
             this.btnSaveFrame.UseVisualStyleBackColor = false;
             this.btnSaveFrame.Click += new System.EventHandler(this.BtnSaveFrame_Click);
             // 
-            // btnCalibration
-            // 
-            this.btnCalibration.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
-            this.btnCalibration.AutoSize = true;
-            this.btnCalibration.BackColor = System.Drawing.Color.DimGray;
-            this.btnCalibration.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCalibration.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnCalibration.ForeColor = System.Drawing.Color.White;
-            this.btnCalibration.Location = new System.Drawing.Point(620, 35); // Initial pos to right of SaveFrame
-            this.btnCalibration.Name = "btnCalibration";
-            this.btnCalibration.Padding = new System.Windows.Forms.Padding(10, 2, 10, 2);
-            this.btnCalibration.Text = "Calibration";
-            this.btnCalibration.UseVisualStyleBackColor = false;
-            this.btnCalibration.Click += new System.EventHandler(this.BtnCalibration_Click);
-            // 
             // VideoPlayerForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -427,6 +423,8 @@ namespace TelescopeWatcher
             this.Controls.Add(this.lblFrameInfo2);
             this.Controls.Add(this.telescopeControlPanel);
             this.Controls.Add(this.btnClose);
+            this.Controls.Add(this.menuStrip1);
+            this.MainMenuStrip = this.menuStrip1;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
             this.KeyPreview = true;
             this.MinimumSize = new System.Drawing.Size(600, 500);
@@ -446,7 +444,10 @@ namespace TelescopeWatcher
             this.telescopeControlPanel.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarStepsPerSecond)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.trackBarFocusSpeed)).EndInit();
+            this.menuStrip1.ResumeLayout(false);
+            this.menuStrip1.PerformLayout();
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
@@ -469,8 +470,8 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Button btnCircleSizeIncrease;
         private System.Windows.Forms.Button btnCircleSizeDecrease;
         private System.Windows.Forms.Label lblCircleSize;
-        private System.Windows.Forms.Button btnMainCameraControl;
-        private System.Windows.Forms.Button btnSecondaryCameraControl;
+        // private System.Windows.Forms.Button btnMainCameraControl; // Removed
+        // private System.Windows.Forms.Button btnSecondaryCameraControl; // Removed
         private System.Windows.Forms.Panel telescopeControlPanel;
         private System.Windows.Forms.TrackBar trackBarStepsPerSecond;
         private System.Windows.Forms.Label lblStepsPerSecond;
@@ -479,6 +480,10 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblFocusSpeed;
         private System.Windows.Forms.Label lblFocusSpeedValue;
         private System.Windows.Forms.Button btnSaveFrame;
-        private System.Windows.Forms.Button btnCalibration;
+        private System.Windows.Forms.MenuStrip menuStrip1;
+        private System.Windows.Forms.ToolStripMenuItem cameraSettingsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem mainCameraToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem secondaryCameraToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem calibrationToolStripMenuItem;
     }
 }

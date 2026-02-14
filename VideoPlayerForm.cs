@@ -295,16 +295,12 @@ namespace TelescopeWatcher
 
         private void PositionSaveFrameButton()
         {
-            if (telescopeControlPanel == null || btnSaveFrame == null || btnCalibration == null) return;
+            if (telescopeControlPanel == null || btnSaveFrame == null) return;
 
-            // Center both buttons group horizontally with a gap
-            int gap = 10;
-            int totalWidth = btnSaveFrame.Width + gap + btnCalibration.Width;
-            
-            int startX = (telescopeControlPanel.Width - totalWidth) / 2;
-            
+            // Center the save frame button
+            int startX = (telescopeControlPanel.Width - btnSaveFrame.Width) / 2;
+
             btnSaveFrame.Location = new Point(startX, 35);
-            btnCalibration.Location = new Point(startX + btnSaveFrame.Width + gap, 35);
         }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
