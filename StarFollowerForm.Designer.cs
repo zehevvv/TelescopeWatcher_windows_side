@@ -31,6 +31,7 @@ namespace TelescopeWatcher
             this.btnStatus = new System.Windows.Forms.Button();
             this.btnDebug = new System.Windows.Forms.Button();
             this.txtOutput = new System.Windows.Forms.TextBox();
+            this.lblActiveStatus = new System.Windows.Forms.Label();
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numThreshold)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numDuration)).BeginInit();
@@ -198,6 +199,16 @@ namespace TelescopeWatcher
             this.btnDebug.UseVisualStyleBackColor = true;
             this.btnDebug.Click += new System.EventHandler(this.btnDebug_Click);
             // 
+            // lblActiveStatus
+            // 
+            this.lblActiveStatus.AutoSize = true;
+            this.lblActiveStatus.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblActiveStatus.Location = new System.Drawing.Point(280, 175);
+            this.lblActiveStatus.Name = "lblActiveStatus";
+            this.lblActiveStatus.Size = new System.Drawing.Size(90, 15);
+            this.lblActiveStatus.TabIndex = 6;
+            this.lblActiveStatus.Text = "Status: Unknown";
+            // 
             // txtOutput
             // 
             this.txtOutput.Location = new System.Drawing.Point(12, 198);
@@ -213,6 +224,7 @@ namespace TelescopeWatcher
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(384, 411);
+            this.Controls.Add(this.lblActiveStatus);
             this.Controls.Add(this.txtOutput);
             this.Controls.Add(this.btnDebug);
             this.Controls.Add(this.btnStatus);
@@ -249,5 +261,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Button btnStatus;
         private System.Windows.Forms.Button btnDebug;
         private System.Windows.Forms.TextBox txtOutput;
+        private System.Windows.Forms.Label lblActiveStatus;
     }
 }

@@ -13,12 +13,78 @@ namespace TelescopeWatcher
         { 
             Timeout = TimeSpan.FromSeconds(30)
         };
+        private System.Windows.Forms.Timer statusTimer;
 
         public StarFollowerForm(string serverUrl)
         {
             InitializeComponent();
             this.serverBaseUrl = serverUrl;
             cbCamera.SelectedIndex = 0; // Default to 'hd'
+
+            statusTimer = new System.Windows.Forms.Timer();
+            statusTimer.Interval = 1000;
+            statusTimer.Tick += StatusTimer_Tick;
+            statusTimer.Start();
+
+            this.FormClosing += StarFollowerForm_FormClosing;
+        }
+
+        private void StarFollowerForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            statusTimer?.Stop();
+            statusTimer?.Dispose();
+        }
+
+        private async void StatusTimer_Tick(object sender, EventArgs e)
+        {
+            await CheckStatusAsync();
+        }
+
+        private async Task CheckStatusAsync()
+        {
+            string url = $"{serverBaseUrl}:5000/star_follower/status";
+            try
+            {
+                var response = await httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    string json = await response.Content.ReadAsStringAsync();
+                    var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("active", out JsonElement activeElement))
+                    {
+                        bool isActive = activeElement.GetBoolean();
+                        UpdateStatusLabel(isActive);
+                    }
+                }
+                else
+                {
+                    UpdateStatusLabel(false, "Server Error");
+                }
+            }
+            catch
+            {
+                UpdateStatusLabel(false, "Connection Error");
+            }
+        }
+
+        private void UpdateStatusLabel(bool isActive, string overrideText = null)
+        {
+            if (lblActiveStatus.InvokeRequired)
+            {
+                lblActiveStatus.Invoke(new Action(() => UpdateStatusLabel(isActive, overrideText)));
+                return;
+            }
+
+            if (overrideText != null)
+            {
+                lblActiveStatus.Text = $"Status: {overrideText}";
+                lblActiveStatus.ForeColor = System.Drawing.Color.DarkOrange;
+            }
+            else
+            {
+                lblActiveStatus.Text = isActive ? "Status: Active" : "Status: Inactive";
+                lblActiveStatus.ForeColor = isActive ? System.Drawing.Color.DarkGreen : System.Drawing.Color.DarkRed;
+            }
         }
 
         private void AppendOutput(string text)
