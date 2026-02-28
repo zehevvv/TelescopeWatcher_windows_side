@@ -776,6 +776,19 @@ namespace TelescopeWatcher
             }
         }
 
+        private void StarFollowerToolStripMenuItem_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var form = new StarFollowerForm(serverBaseUrl);
+                form.Show(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening star follower: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         #region Keyboard Control Methods
 
         private void VideoPlayerForm_KeyDown(object? sender, KeyEventArgs e)
