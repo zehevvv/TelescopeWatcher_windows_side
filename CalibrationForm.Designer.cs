@@ -1,4 +1,3 @@
-
 namespace TelescopeWatcher
 {
     partial class CalibrationForm
@@ -60,6 +59,7 @@ namespace TelescopeWatcher
             this.txtCmd.Name = "txtCmd";
             this.txtCmd.Size = new System.Drawing.Size(300, 23);
             this.txtCmd.TabIndex = 3;
+            this.txtCmd.Text = "v=0\\nd=0\\nt=1\\ns=1000\\n";
             // 
             // btnSend
             // 

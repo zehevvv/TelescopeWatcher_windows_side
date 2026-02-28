@@ -448,7 +448,7 @@ namespace TelescopeWatcher
             this.menuStrip1.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
-
+            this.BackColor = System.Drawing.Color.Black;
         }
 
         #endregion
