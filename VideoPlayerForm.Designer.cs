@@ -33,6 +33,8 @@ namespace TelescopeWatcher
             this.mainCameraToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.secondaryCameraToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.calibrationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.plateSolverToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.pictureBox2 = new System.Windows.Forms.PictureBox();
             this.videoPanel = new System.Windows.Forms.Panel();
@@ -71,7 +73,8 @@ namespace TelescopeWatcher
             // menuStrip1
             // 
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.cameraSettingsToolStripMenuItem});
+            this.cameraSettingsToolStripMenuItem,
+            this.toolsToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
             this.menuStrip1.Size = new System.Drawing.Size(1200, 24);
@@ -108,6 +111,21 @@ namespace TelescopeWatcher
             this.calibrationToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.calibrationToolStripMenuItem.Text = "Calibration";
             this.calibrationToolStripMenuItem.Click += new System.EventHandler(this.BtnCalibration_Click);
+            // 
+            // toolsToolStripMenuItem
+            // 
+            this.toolsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.plateSolverToolStripMenuItem});
+            this.toolsToolStripMenuItem.Name = "toolsToolStripMenuItem";
+            this.toolsToolStripMenuItem.Size = new System.Drawing.Size(46, 20);
+            this.toolsToolStripMenuItem.Text = "Tools";
+            // 
+            // plateSolverToolStripMenuItem
+            // 
+            this.plateSolverToolStripMenuItem.Name = "plateSolverToolStripMenuItem";
+            this.plateSolverToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.plateSolverToolStripMenuItem.Text = "Plate Solver";
+            this.plateSolverToolStripMenuItem.Click += new System.EventHandler(this.PlateSolverToolStripMenuItem_Click);
             // 
             // pictureBox1
             // 
@@ -485,5 +503,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.ToolStripMenuItem mainCameraToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem secondaryCameraToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem calibrationToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem toolsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem plateSolverToolStripMenuItem;
     }
 }

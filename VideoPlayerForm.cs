@@ -763,6 +763,19 @@ namespace TelescopeWatcher
             }
         }
 
+        private void PlateSolverToolStripMenuItem_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var form = new PlateSolverForm(serverBaseUrl);
+                form.Show(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening plate solver: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         #region Keyboard Control Methods
 
         private void VideoPlayerForm_KeyDown(object? sender, KeyEventArgs e)
