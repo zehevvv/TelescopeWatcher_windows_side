@@ -43,8 +43,10 @@ namespace TelescopeWatcher
             this.lblStatus = new System.Windows.Forms.Label();
             this.lblFrameInfo1 = new System.Windows.Forms.Label();
             this.lblFrameInfo2 = new System.Windows.Forms.Label();
-            this.chkFlipHorizontal = new System.Windows.Forms.CheckBox();
-            this.chkFlipVertical = new System.Windows.Forms.CheckBox();
+            this.chkMainFlipH = new System.Windows.Forms.CheckBox();
+            this.chkMainFlipV = new System.Windows.Forms.CheckBox();
+            this.chkSecFlipH = new System.Windows.Forms.CheckBox();
+            this.chkSecFlipV = new System.Windows.Forms.CheckBox();
             this.radioMainOnly = new System.Windows.Forms.RadioButton();
             this.radioSecondaryOnly = new System.Windows.Forms.RadioButton();
             this.radioBoth = new System.Windows.Forms.RadioButton();
@@ -214,31 +216,57 @@ namespace TelescopeWatcher
             this.lblFrameInfo2.Text = "Secondary: Frame 0 | FPS: 0.0";
             this.lblFrameInfo2.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
-            // chkFlipHorizontal
+            // chkMainFlipH
             // 
-            this.chkFlipHorizontal.AutoSize = true;
-            this.chkFlipHorizontal.Checked = true;
-            this.chkFlipHorizontal.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkFlipHorizontal.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.chkFlipHorizontal.ForeColor = System.Drawing.Color.White;
-            this.chkFlipHorizontal.Location = new System.Drawing.Point(420, 8);
-            this.chkFlipHorizontal.Name = "chkFlipHorizontal";
-            this.chkFlipHorizontal.Text = "Flip H";
-            this.chkFlipHorizontal.UseVisualStyleBackColor = true;
-            this.chkFlipHorizontal.CheckedChanged += new System.EventHandler(this.ChkFlipHorizontal_CheckedChanged);
+            this.chkMainFlipH.AutoSize = true;
+            this.chkMainFlipH.Checked = true;
+            this.chkMainFlipH.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkMainFlipH.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.chkMainFlipH.ForeColor = System.Drawing.Color.White;
+            this.chkMainFlipH.Location = new System.Drawing.Point(380, 8);
+            this.chkMainFlipH.Name = "chkMainFlipH";
+            this.chkMainFlipH.Text = "Main H";
+            this.chkMainFlipH.UseVisualStyleBackColor = true;
+            this.chkMainFlipH.CheckedChanged += new System.EventHandler(this.ChkMainFlipH_CheckedChanged);
             // 
-            // chkFlipVertical
+            // chkMainFlipV
             // 
-            this.chkFlipVertical.AutoSize = true;
-            this.chkFlipVertical.Checked = true;
-            this.chkFlipVertical.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkFlipVertical.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.chkFlipVertical.ForeColor = System.Drawing.Color.White;
-            this.chkFlipVertical.Location = new System.Drawing.Point(500, 8);
-            this.chkFlipVertical.Name = "chkFlipVertical";
-            this.chkFlipVertical.Text = "Flip V";
-            this.chkFlipVertical.UseVisualStyleBackColor = true;
-            this.chkFlipVertical.CheckedChanged += new System.EventHandler(this.ChkFlipVertical_CheckedChanged);
+            this.chkMainFlipV.AutoSize = true;
+            this.chkMainFlipV.Checked = true;
+            this.chkMainFlipV.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkMainFlipV.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.chkMainFlipV.ForeColor = System.Drawing.Color.White;
+            this.chkMainFlipV.Location = new System.Drawing.Point(440, 8);
+            this.chkMainFlipV.Name = "chkMainFlipV";
+            this.chkMainFlipV.Text = "Main V";
+            this.chkMainFlipV.UseVisualStyleBackColor = true;
+            this.chkMainFlipV.CheckedChanged += new System.EventHandler(this.ChkMainFlipV_CheckedChanged);
+            // 
+            // chkSecFlipH
+            // 
+            this.chkSecFlipH.AutoSize = true;
+            this.chkSecFlipH.Checked = true;
+            this.chkSecFlipH.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkSecFlipH.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.chkSecFlipH.ForeColor = System.Drawing.Color.White;
+            this.chkSecFlipH.Location = new System.Drawing.Point(500, 8);
+            this.chkSecFlipH.Name = "chkSecFlipH";
+            this.chkSecFlipH.Text = "Sec H";
+            this.chkSecFlipH.UseVisualStyleBackColor = true;
+            this.chkSecFlipH.CheckedChanged += new System.EventHandler(this.ChkSecFlipH_CheckedChanged);
+            // 
+            // chkSecFlipV
+            // 
+            this.chkSecFlipV.AutoSize = true;
+            this.chkSecFlipV.Checked = true;
+            this.chkSecFlipV.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkSecFlipV.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.chkSecFlipV.ForeColor = System.Drawing.Color.White;
+            this.chkSecFlipV.Location = new System.Drawing.Point(560, 8);
+            this.chkSecFlipV.Name = "chkSecFlipV";
+            this.chkSecFlipV.Text = "Sec V";
+            this.chkSecFlipV.UseVisualStyleBackColor = true;
+            this.chkSecFlipV.CheckedChanged += new System.EventHandler(this.ChkSecFlipV_CheckedChanged);
             // 
             // radioMainOnly
             // 
@@ -281,8 +309,10 @@ namespace TelescopeWatcher
             this.controlPanel.Controls.Add(this.radioMainOnly);
             this.controlPanel.Controls.Add(this.radioSecondaryOnly);
             this.controlPanel.Controls.Add(this.radioBoth);
-            this.controlPanel.Controls.Add(this.chkFlipHorizontal);
-            this.controlPanel.Controls.Add(this.chkFlipVertical);
+            this.controlPanel.Controls.Add(this.chkMainFlipH);
+            this.controlPanel.Controls.Add(this.chkMainFlipV);
+            this.controlPanel.Controls.Add(this.chkSecFlipH);
+            this.controlPanel.Controls.Add(this.chkSecFlipV);
             this.controlPanel.Controls.Add(this.btnAddCircle);
             this.controlPanel.Controls.Add(this.btnCircleSizeDecrease);
             this.controlPanel.Controls.Add(this.lblCircleSize);
@@ -487,8 +517,10 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Label lblFrameInfo1;
         private System.Windows.Forms.Label lblFrameInfo2;
-        private System.Windows.Forms.CheckBox chkFlipHorizontal;
-        private System.Windows.Forms.CheckBox chkFlipVertical;
+        private System.Windows.Forms.CheckBox chkMainFlipH;
+        private System.Windows.Forms.CheckBox chkMainFlipV;
+        private System.Windows.Forms.CheckBox chkSecFlipH;
+        private System.Windows.Forms.CheckBox chkSecFlipV;
         private System.Windows.Forms.RadioButton radioMainOnly;
         private System.Windows.Forms.RadioButton radioSecondaryOnly;
         private System.Windows.Forms.RadioButton radioBoth;

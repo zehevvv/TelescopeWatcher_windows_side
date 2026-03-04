@@ -83,7 +83,7 @@ namespace TelescopeWatcher
             this.txtSpeedCmd.Name = "txtSpeedCmd";
             this.txtSpeedCmd.Size = new System.Drawing.Size(120, 23);
             this.txtSpeedCmd.TabIndex = 7;
-            this.txtSpeedCmd.Text = "s=500";
+            this.txtSpeedCmd.Text = "t=100\\n";
             // 
             // label4
             // 
@@ -100,7 +100,7 @@ namespace TelescopeWatcher
             this.txtStepsCmd.Name = "txtStepsCmd";
             this.txtStepsCmd.Size = new System.Drawing.Size(120, 23);
             this.txtStepsCmd.TabIndex = 5;
-            this.txtStepsCmd.Text = "s=500";
+            this.txtStepsCmd.Text = "s=10\\n";
             // 
             // label3
             // 
@@ -118,7 +118,7 @@ namespace TelescopeWatcher
             this.numThreshold.Size = new System.Drawing.Size(120, 23);
             this.numThreshold.TabIndex = 3;
             this.numThreshold.Value = new decimal(new int[] {
-            50,
+            1,
             0,
             0,
             0});
@@ -137,7 +137,7 @@ namespace TelescopeWatcher
             this.numDuration.DecimalPlaces = 1;
             this.numDuration.Location = new System.Drawing.Point(100, 20);
             this.numDuration.Maximum = new decimal(new int[] {
-            10000,
+            1,
             0,
             0,
             0});
@@ -145,7 +145,7 @@ namespace TelescopeWatcher
             this.numDuration.Size = new System.Drawing.Size(120, 23);
             this.numDuration.TabIndex = 1;
             this.numDuration.Value = new decimal(new int[] {
-            10,
+            1,
             0,
             0,
             0});

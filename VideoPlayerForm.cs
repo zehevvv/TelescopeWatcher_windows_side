@@ -22,11 +22,11 @@ namespace TelescopeWatcher
         private int frameCount2 = 0; // Added for FPS
         private long lastFpsUpdate1 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private long lastFpsUpdate2 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        private bool flipHorizontal = true;
-        private bool flipVertical = true;
+        private bool mainFlipHorizontal = true;
+        private bool mainFlipVertical = true;
+        private bool secFlipHorizontal = true;
+        private bool secFlipVertical = true;
 
-        // private WebView2? webView; // Removed
-        
         // Circle overlay fields
         private bool isAddingCircle = false;
         private Point? whiteCirclePosition = null;
@@ -93,13 +93,13 @@ namespace TelescopeWatcher
             
             this.mjpegClient1 = new MjpegStreamClient(); // Init client 1
             this.mjpegClient1.FrameReceived += MjpegClient1_FrameReceived; // Specific handler
-            this.mjpegClient1.FlipHorizontal = flipHorizontal;
-            this.mjpegClient1.FlipVertical = flipVertical;
+            this.mjpegClient1.FlipHorizontal = mainFlipHorizontal;
+            this.mjpegClient1.FlipVertical = mainFlipVertical;
 
             this.mjpegClient2 = new MjpegStreamClient(); // Init client 2
             this.mjpegClient2.FrameReceived += MjpegClient2_FrameReceived; // Specific handler
-            this.mjpegClient2.FlipHorizontal = flipHorizontal;
-            this.mjpegClient2.FlipVertical = flipVertical;
+            this.mjpegClient2.FlipHorizontal = secFlipHorizontal;
+            this.mjpegClient2.FlipVertical = secFlipVertical;
             
             InitializeComponent(); // Controls created here
 
@@ -419,13 +419,13 @@ namespace TelescopeWatcher
                 UpdateStatus("Connecting to streams...", System.Drawing.Color.DarkOrange);
                 
                 // Start Stream 1 (Main)
-                mjpegClient1.FlipHorizontal = flipHorizontal;
-                mjpegClient1.FlipVertical = flipVertical;
+                mjpegClient1.FlipHorizontal = mainFlipHorizontal;
+                mjpegClient1.FlipVertical = mainFlipVertical;
                 var task1 = mjpegClient1.StartStream(mjpegUrl1, 1);
 
                 // Start Stream 2 (Secondary)
-                mjpegClient2.FlipHorizontal = flipHorizontal;
-                mjpegClient2.FlipVertical = flipVertical;
+                mjpegClient2.FlipHorizontal = secFlipHorizontal;
+                mjpegClient2.FlipVertical = secFlipVertical;
                 var task2 = mjpegClient2.StartStream(mjpegUrl2, 2);
 
                 await Task.WhenAll(task1, task2); // Wait for initialization logic if any (StartStream mostly async void/Task)
@@ -686,28 +686,33 @@ namespace TelescopeWatcher
             pictureBox2?.Image?.Dispose();
         }
 
-        private void ChkFlipHorizontal_CheckedChanged(object? sender, EventArgs e)
+        private void ChkMainFlipH_CheckedChanged(object? sender, EventArgs e)
         {
-            flipHorizontal = chkFlipHorizontal.Checked;
-            if (mjpegClient1 != null) mjpegClient1.FlipHorizontal = flipHorizontal;
-            if (mjpegClient2 != null) mjpegClient2.FlipHorizontal = flipHorizontal;
-            // ApplyVideoTransform(); // Removed WebView logic
-            System.Diagnostics.Debug.WriteLine($"Flip Horizontal: {flipHorizontal}");
+            mainFlipHorizontal = chkMainFlipH.Checked;
+            if (mjpegClient1 != null) mjpegClient1.FlipHorizontal = mainFlipHorizontal;
+            System.Diagnostics.Debug.WriteLine($"Main Flip Horizontal: {mainFlipHorizontal}");
         }
 
-        private void ChkFlipVertical_CheckedChanged(object? sender, EventArgs e)
+        private void ChkMainFlipV_CheckedChanged(object? sender, EventArgs e)
         {
-            flipVertical = chkFlipVertical.Checked;
-            if (mjpegClient1 != null) mjpegClient1.FlipVertical = flipVertical;
-            if (mjpegClient2 != null) mjpegClient2.FlipVertical = flipVertical;
-            // ApplyVideoTransform(); // Removed WebView logic
-            System.Diagnostics.Debug.WriteLine($"Flip Vertical: {flipVertical}");
+            mainFlipVertical = chkMainFlipV.Checked;
+            if (mjpegClient1 != null) mjpegClient1.FlipVertical = mainFlipVertical;
+            System.Diagnostics.Debug.WriteLine($"Main Flip Vertical: {mainFlipVertical}");
         }
 
-        // Removed ApplyVideoTransform
-        // Removed CoreWebView2_WebMessageReceived
-        // Removed WebView_NavigationCompleted
-        // Removed VideoMessage class
+        private void ChkSecFlipH_CheckedChanged(object? sender, EventArgs e)
+        {
+            secFlipHorizontal = chkSecFlipH.Checked;
+            if (mjpegClient2 != null) mjpegClient2.FlipHorizontal = secFlipHorizontal;
+            System.Diagnostics.Debug.WriteLine($"Sec Flip Horizontal: {secFlipHorizontal}");
+        }
+
+        private void ChkSecFlipV_CheckedChanged(object? sender, EventArgs e)
+        {
+            secFlipVertical = chkSecFlipV.Checked;
+            if (mjpegClient2 != null) mjpegClient2.FlipVertical = secFlipVertical;
+            System.Diagnostics.Debug.WriteLine($"Sec Flip Vertical: {secFlipVertical}");
+        }
 
         private async void BtnSaveFrame_Click(object sender, EventArgs e)
         {
