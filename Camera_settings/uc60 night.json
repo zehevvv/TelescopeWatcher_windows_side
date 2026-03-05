@@ -8,7 +8,7 @@
       "max": 64,
       "step": 1,
       "default": 0,
-      "value": 37
+      "value": 36
     },
     {
       "name": "contrast",
@@ -17,7 +17,7 @@
       "max": 100,
       "step": 1,
       "default": 51,
-      "value": 30
+      "value": 45
     },
     {
       "name": "saturation",
@@ -26,7 +26,7 @@
       "max": 100,
       "step": 1,
       "default": 64,
-      "value": 30
+      "value": 43
     },
     {
       "name": "hue",
@@ -107,7 +107,7 @@
       "max": 10000,
       "step": 1,
       "default": 166,
-      "value": 5006
+      "value": 10000
     },
     {
       "name": "exposure_dynamic_framerate",
