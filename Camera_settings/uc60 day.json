@@ -1,0 +1,140 @@
+{
+  "CameraName": "uc60",
+  "Controls": [
+    {
+      "name": "brightness",
+      "type": "int",
+      "min": -64,
+      "max": 64,
+      "step": 1,
+      "default": 0,
+      "value": -64
+    },
+    {
+      "name": "contrast",
+      "type": "int",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 51,
+      "value": 61
+    },
+    {
+      "name": "saturation",
+      "type": "int",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 64,
+      "value": 55
+    },
+    {
+      "name": "hue",
+      "type": "int",
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "default": 0,
+      "value": -1
+    },
+    {
+      "name": "white_balance_automatic",
+      "type": "bool",
+      "min": null,
+      "max": null,
+      "step": null,
+      "default": 1,
+      "value": 1
+    },
+    {
+      "name": "gamma",
+      "type": "int",
+      "min": 100,
+      "max": 500,
+      "step": 1,
+      "default": 300,
+      "value": 278
+    },
+    {
+      "name": "power_line_frequency",
+      "type": "menu",
+      "min": 0,
+      "max": 2,
+      "step": null,
+      "default": 1,
+      "value": 1
+    },
+    {
+      "name": "white_balance_temperature",
+      "type": "int",
+      "min": 2800,
+      "max": 6500,
+      "step": 10,
+      "default": 4600,
+      "value": 4600
+    },
+    {
+      "name": "sharpness",
+      "type": "int",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 80,
+      "value": 80
+    },
+    {
+      "name": "backlight_compensation",
+      "type": "int",
+      "min": 0,
+      "max": 2,
+      "step": 1,
+      "default": 0,
+      "value": 0
+    },
+    {
+      "name": "auto_exposure",
+      "type": "menu",
+      "min": 0,
+      "max": 3,
+      "step": null,
+      "default": 3,
+      "value": 1
+    },
+    {
+      "name": "exposure_time_absolute",
+      "type": "int",
+      "min": 50,
+      "max": 10000,
+      "step": 1,
+      "default": 166,
+      "value": 50
+    },
+    {
+      "name": "exposure_dynamic_framerate",
+      "type": "bool",
+      "min": null,
+      "max": null,
+      "step": null,
+      "default": 0,
+      "value": 0
+    },
+    {
+      "name": "focus_absolute",
+      "type": "int",
+      "min": 0,
+      "max": 1023,
+      "step": 1,
+      "default": 68,
+      "value": 68
+    },
+    {
+      "name": "focus_automatic_continuous",
+      "type": "bool",
+      "min": null,
+      "max": null,
+      "step": null,
+      "default": 1,
+      "value": 1
+    }
+  ]
+}
