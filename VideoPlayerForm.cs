@@ -139,10 +139,10 @@ namespace TelescopeWatcher
 
             settings.FocusSpeed = focusMotorSpeed;
 
-            // Reparent pictureBox2 to Form so it can share space with webView
-            if (pictureBox2 != null)
+            // Keep both PictureBoxes inside videoPanel for proper split layout
+            if (this.videoPanel != null)
             {
-                this.Controls.Add(pictureBox2); // Move from videoPanel to Form
+                this.videoPanel.Visible = true;
             }
             
             // Hide the old VideoView/Panel if it exists
@@ -350,10 +350,10 @@ namespace TelescopeWatcher
 
         private void VideoPlayerForm_Resize(object? sender, EventArgs e)
         {
-            if (radioBoth != null && radioBoth.Checked && pictureBox2 != null)
+            if (radioBoth != null && radioBoth.Checked && pictureBox2 != null && videoPanel != null)
             {
                 // Maintain 50% split on resize
-                pictureBox2.Width = this.ClientSize.Width / 2;
+                pictureBox2.Width = videoPanel.ClientSize.Width / 2;
             }
             
             // Force re-layout
@@ -411,12 +411,12 @@ namespace TelescopeWatcher
                 if (lblFrameInfo1 != null) lblFrameInfo1.Visible = true;
                 if (lblFrameInfo2 != null) lblFrameInfo2.Visible = true;
 
-                // 1. Setup PicBox2 (Right)
+                // 1. Setup PicBox2 (Right) - docked inside videoPanel
                 pictureBox2.Dock = DockStyle.Right;
-                pictureBox2.Width = this.ClientSize.Width / 2;
+                pictureBox2.Width = videoPanel.ClientSize.Width / 2;
                 pictureBox2.BringToFront(); 
 
-                // 2. Setup PicBox1 (Fill remaining)
+                // 2. Setup PicBox1 (Fill remaining space inside videoPanel)
                 pictureBox1.Dock = DockStyle.Fill;
                 pictureBox1.BringToFront(); 
             }
