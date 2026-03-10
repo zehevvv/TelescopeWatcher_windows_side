@@ -1,6 +1,6 @@
 using System.Net.Http;
 using System.Text;
-using System.IO.Ports; // Fixed from System.IO.Pials
+using System.IO.Ports;
 using System.Diagnostics;
 using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Core;
@@ -10,16 +10,18 @@ namespace TelescopeWatcher
     public partial class VideoPlayerForm : Form
     {
         private readonly string serverBaseUrl;
-        private readonly string mjpegUrl1; // Added
+        private readonly string primaryCameraName;
+        private readonly string secondaryCameraName;
+        private readonly string mjpegUrl1;
         private readonly string mjpegUrl2;
         private HttpClient? httpClient2;
         private CancellationTokenSource? cancellationToken;
         private Task? streamTask2;
         private bool isStreaming = false;
-        private int totalFrameCount1 = 0; // Added for FPS
+        private int totalFrameCount1 = 0;
         private int totalFrameCount2 = 0;
-        private int frameCount1 = 0; // Added for FPS
-        private int frameCount2 = 0; // Added for FPS
+        private int frameCount1 = 0;
+        private int frameCount2 = 0;
         private long lastFpsUpdate1 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private long lastFpsUpdate2 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private bool mainFlipHorizontal = true;
@@ -39,22 +41,17 @@ namespace TelescopeWatcher
 
         // Telescope control fields
         private TelescopeController telescopeController;
-        private MjpegStreamClient mjpegClient1; // Added
-        private MjpegStreamClient mjpegClient2; // Renamed from mjpegClient
+        private MjpegStreamClient mjpegClient1;
+        private MjpegStreamClient mjpegClient2;
         
-        // Removed separate connection fields managed by controller
         private bool isKeyPressed = false;
         private bool isFocusKeyPressed = false;
         private string currentDirection = "";
         private string currentFocusDirection = "";
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
-        private System.Windows.Forms.Timer fpsTimer; // Added frame timer
-        private int lastDisplayedPictures = 0; // For FPS calc
-
-        // New flags to drop frames if UI is busy
-        // private volatile bool isUpdating1 = false; // Removed
-        // private volatile bool isUpdating2 = false; // Removed
+        private System.Windows.Forms.Timer fpsTimer;
+        private int lastDisplayedPictures = 0;
 
         // Latest Frame Synchronization
         private readonly object _lock1 = new object();
@@ -67,23 +64,42 @@ namespace TelescopeWatcher
 
         private Action<string>? logCallback;
 
-        public VideoPlayerForm(string serverUrl, SerialPort? port = null, SerialServerClient? client = null, 
+        // Camera name to port mapping
+        private static readonly Dictionary<string, int> CameraPortMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "hd", 5001 },
+            { "uc60", 5002 }
+        };
+
+        private static int GetCameraPort(string cameraName)
+        {
+            if (CameraPortMap.TryGetValue(cameraName, out int port))
+                return port;
+            return 5001; // fallback
+        }
+
+        public VideoPlayerForm(string serverUrl, string primaryCamera, string secondaryCamera,
+                               SerialPort? port = null, SerialServerClient? client = null, 
                                int stepsPerSecond = 1000, int focusMotorSpeed = 9, Action<string>? logCallback = null)
         {
             this.serverBaseUrl = serverUrl;
+            this.primaryCameraName = primaryCamera;
+            this.secondaryCameraName = secondaryCamera;
             
             try
             {
                 var uri = new Uri(serverUrl);
-                // Assume Main on 5001, Secondary on 5002
-                this.mjpegUrl1 = $"{uri.Scheme}://{uri.Host}:5001/?action=stream";
-                this.mjpegUrl2 = $"{uri.Scheme}://{uri.Host}:5002/?action=stream";
+                int primaryPort = GetCameraPort(primaryCamera);
+                int secondaryPort = GetCameraPort(secondaryCamera);
+                this.mjpegUrl1 = $"{uri.Scheme}://{uri.Host}:{primaryPort}/?action=stream";
+                this.mjpegUrl2 = $"{uri.Scheme}://{uri.Host}:{secondaryPort}/?action=stream";
             }
             catch
             {
-                // Fallback
-                this.mjpegUrl1 = $"{serverUrl}:5001/?action=stream";
-                this.mjpegUrl2 = $"{serverUrl}:5002/?action=stream"; 
+                int primaryPort = GetCameraPort(primaryCamera);
+                int secondaryPort = GetCameraPort(secondaryCamera);
+                this.mjpegUrl1 = $"{serverUrl}:{primaryPort}/?action=stream";
+                this.mjpegUrl2 = $"{serverUrl}:{secondaryPort}/?action=stream"; 
             }
             
             this.logCallback = logCallback;
@@ -91,19 +107,22 @@ namespace TelescopeWatcher
             // Initialize Helpers
             this.telescopeController = new TelescopeController(port, client, logCallback);
             
-            this.mjpegClient1 = new MjpegStreamClient(); // Init client 1
-            this.mjpegClient1.FrameReceived += MjpegClient1_FrameReceived; // Specific handler
+            this.mjpegClient1 = new MjpegStreamClient();
+            this.mjpegClient1.FrameReceived += MjpegClient1_FrameReceived;
             this.mjpegClient1.FlipHorizontal = mainFlipHorizontal;
             this.mjpegClient1.FlipVertical = mainFlipVertical;
 
-            this.mjpegClient2 = new MjpegStreamClient(); // Init client 2
-            this.mjpegClient2.FrameReceived += MjpegClient2_FrameReceived; // Specific handler
+            this.mjpegClient2 = new MjpegStreamClient();
+            this.mjpegClient2.FrameReceived += MjpegClient2_FrameReceived;
             this.mjpegClient2.FlipHorizontal = secFlipHorizontal;
             this.mjpegClient2.FlipVertical = secFlipVertical;
             
-            InitializeComponent(); // Controls created here
+            InitializeComponent();
 
-             // Use shared settings via Controller
+            // Update title with camera names
+            this.Text = $"Video Stream - Primary: {primaryCamera.ToUpper()}, Guide: {secondaryCamera.ToUpper()}";
+
+            // Use shared settings via Controller
             var settings = TelescopeSettings.Instance;
             telescopeController.TimeBetweenSteps = settings.TimeBetweenSteps;
             telescopeController.FocusSpeed = settings.FocusSpeed;
@@ -1048,13 +1067,13 @@ namespace TelescopeWatcher
         {
             try
             {
-                var settingsForm = new CameraSettingsForm(serverBaseUrl, "hd");
+                var settingsForm = new CameraSettingsForm(serverBaseUrl, primaryCameraName);
                 settingsForm.Show();
-                LogMessage($"Opening Main Camera settings window");
+                LogMessage($"Opening Primary Camera ({primaryCameraName.ToUpper()}) settings window");
             }
             catch (Exception ex)
             {
-                LogMessage($"Error opening Main Camera settings wndow: {ex.Message}");
+                LogMessage($"Error opening Primary Camera settings window: {ex.Message}");
                 MessageBox.Show($"Failed to open camera settings:\n\n{ex.Message}",
                     "Settings Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -1064,9 +1083,9 @@ namespace TelescopeWatcher
         {
             try
             {
-                var settingsForm = new CameraSettingsForm(serverBaseUrl, "uc60");
+                var settingsForm = new CameraSettingsForm(serverBaseUrl, secondaryCameraName);
                 settingsForm.Show();
-                LogMessage($"Opening Secondary Camera settings window");
+                LogMessage($"Opening Secondary Camera ({secondaryCameraName.ToUpper()}) settings window");
             }
             catch (Exception ex)
             {

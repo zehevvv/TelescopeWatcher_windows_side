@@ -48,6 +48,10 @@ namespace TelescopeWatcher
             this.btnFocusDecrease = new System.Windows.Forms.Button();
             this.btnFocusIncrease = new System.Windows.Forms.Button();
             this.grpVideoStream = new System.Windows.Forms.GroupBox();
+            this.lblPrimaryCamera = new System.Windows.Forms.Label();
+            this.cmbPrimaryCamera = new System.Windows.Forms.ComboBox();
+            this.lblSecondaryCamera = new System.Windows.Forms.Label();
+            this.cmbSecondaryCamera = new System.Windows.Forms.ComboBox();
             this.lblVideoStatus = new System.Windows.Forms.Label();
             this.btnVideoStop = new System.Windows.Forms.Button();
             this.btnVideoStart = new System.Windows.Forms.Button();
@@ -289,23 +293,65 @@ namespace TelescopeWatcher
             // 
             // grpVideoStream
             // 
+            this.grpVideoStream.Controls.Add(this.lblPrimaryCamera);
+            this.grpVideoStream.Controls.Add(this.cmbPrimaryCamera);
+            this.grpVideoStream.Controls.Add(this.lblSecondaryCamera);
+            this.grpVideoStream.Controls.Add(this.cmbSecondaryCamera);
             this.grpVideoStream.Controls.Add(this.lblVideoStatus);
             this.grpVideoStream.Controls.Add(this.btnVideoStop);
             this.grpVideoStream.Controls.Add(this.btnVideoStart);
             this.grpVideoStream.Controls.Add(this.btnRestart);
             this.grpVideoStream.Location = new System.Drawing.Point(390, 210);
             this.grpVideoStream.Name = "grpVideoStream";
-            this.grpVideoStream.Size = new System.Drawing.Size(200, 105);
+            this.grpVideoStream.Size = new System.Drawing.Size(200, 130);
             this.grpVideoStream.TabIndex = 10;
             this.grpVideoStream.TabStop = false;
             this.grpVideoStream.Text = "Video Stream";
+            // 
+            // lblPrimaryCamera
+            // 
+            this.lblPrimaryCamera.AutoSize = true;
+            this.lblPrimaryCamera.Font = new System.Drawing.Font("Segoe UI", 8F);
+            this.lblPrimaryCamera.Location = new System.Drawing.Point(15, 20);
+            this.lblPrimaryCamera.Name = "lblPrimaryCamera";
+            this.lblPrimaryCamera.Size = new System.Drawing.Size(48, 13);
+            this.lblPrimaryCamera.TabIndex = 10;
+            this.lblPrimaryCamera.Text = "Primary:";
+            // 
+            // cmbPrimaryCamera
+            // 
+            this.cmbPrimaryCamera.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbPrimaryCamera.Font = new System.Drawing.Font("Segoe UI", 8F);
+            this.cmbPrimaryCamera.Location = new System.Drawing.Point(65, 17);
+            this.cmbPrimaryCamera.Name = "cmbPrimaryCamera";
+            this.cmbPrimaryCamera.Size = new System.Drawing.Size(55, 21);
+            this.cmbPrimaryCamera.TabIndex = 11;
+            // 
+            // lblSecondaryCamera
+            // 
+            this.lblSecondaryCamera.AutoSize = true;
+            this.lblSecondaryCamera.Font = new System.Drawing.Font("Segoe UI", 8F);
+            this.lblSecondaryCamera.Location = new System.Drawing.Point(125, 20);
+            this.lblSecondaryCamera.Name = "lblSecondaryCamera";
+            this.lblSecondaryCamera.Size = new System.Drawing.Size(38, 13);
+            this.lblSecondaryCamera.TabIndex = 12;
+            this.lblSecondaryCamera.Text = "Guide:";
+            // 
+            // cmbSecondaryCamera
+            // 
+            this.cmbSecondaryCamera.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbSecondaryCamera.Font = new System.Drawing.Font("Segoe UI", 8F);
+            this.cmbSecondaryCamera.Location = new System.Drawing.Point(163, 17);
+            this.cmbSecondaryCamera.Name = "cmbSecondaryCamera";
+            this.cmbSecondaryCamera.Size = new System.Drawing.Size(55, 21);
+            this.cmbSecondaryCamera.TabIndex = 13;
             // 
             // lblVideoStatus
             // 
             this.lblVideoStatus.AutoSize = true;
             this.lblVideoStatus.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.lblVideoStatus.ForeColor = System.Drawing.Color.Gray;
-            this.lblVideoStatus.Location = new System.Drawing.Point(15, 80);
+            this.lblVideoStatus.Location = new System.Drawing.Point(15, 88);
             this.lblVideoStatus.Name = "lblVideoStatus";
             this.lblVideoStatus.Size = new System.Drawing.Size(80, 15);
             this.lblVideoStatus.TabIndex = 2;
@@ -318,9 +364,9 @@ namespace TelescopeWatcher
             this.btnVideoStop.FlatAppearance.BorderColor = System.Drawing.Color.IndianRed;
             this.btnVideoStop.FlatAppearance.BorderSize = 2;
             this.btnVideoStop.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnVideoStop.Location = new System.Drawing.Point(105, 20);
+            this.btnVideoStop.Location = new System.Drawing.Point(105, 40);
             this.btnVideoStop.Name = "btnVideoStop";
-            this.btnVideoStop.Size = new System.Drawing.Size(80, 35);
+            this.btnVideoStop.Size = new System.Drawing.Size(80, 30);
             this.btnVideoStop.TabIndex = 1;
             this.btnVideoStop.Text = "Stop";
             this.btnVideoStop.UseVisualStyleBackColor = false;
@@ -333,9 +379,9 @@ namespace TelescopeWatcher
             this.btnVideoStart.FlatAppearance.BorderColor = System.Drawing.Color.Green;
             this.btnVideoStart.FlatAppearance.BorderSize = 2;
             this.btnVideoStart.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnVideoStart.Location = new System.Drawing.Point(15, 20);
+            this.btnVideoStart.Location = new System.Drawing.Point(15, 40);
             this.btnVideoStart.Name = "btnVideoStart";
-            this.btnVideoStart.Size = new System.Drawing.Size(80, 35);
+            this.btnVideoStart.Size = new System.Drawing.Size(80, 30);
             this.btnVideoStart.TabIndex = 0;
             this.btnVideoStart.Text = "Start";
             this.btnVideoStart.UseVisualStyleBackColor = false;
@@ -348,9 +394,9 @@ namespace TelescopeWatcher
             this.btnRestart.FlatAppearance.BorderColor = System.Drawing.Color.Orange;
             this.btnRestart.FlatAppearance.BorderSize = 2;
             this.btnRestart.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold);
-            this.btnRestart.Location = new System.Drawing.Point(60, 58);
+            this.btnRestart.Location = new System.Drawing.Point(60, 72);
             this.btnRestart.Name = "btnRestart";
-            this.btnRestart.Size = new System.Drawing.Size(80, 22);
+            this.btnRestart.Size = new System.Drawing.Size(80, 18);
             this.btnRestart.TabIndex = 3;
             this.btnRestart.Text = "Restart";
             this.btnRestart.UseVisualStyleBackColor = false;
@@ -413,6 +459,10 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Button btnFocusDecrease;
         private System.Windows.Forms.Button btnFocusIncrease;
         private System.Windows.Forms.GroupBox grpVideoStream;
+        private System.Windows.Forms.Label lblPrimaryCamera;
+        private System.Windows.Forms.ComboBox cmbPrimaryCamera;
+        private System.Windows.Forms.Label lblSecondaryCamera;
+        private System.Windows.Forms.ComboBox cmbSecondaryCamera;
         private System.Windows.Forms.Label lblVideoStatus;
         private System.Windows.Forms.Button btnVideoStop;
         private System.Windows.Forms.Button btnVideoStart;

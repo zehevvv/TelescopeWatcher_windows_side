@@ -23,12 +23,23 @@ namespace TelescopeWatcher
         private HttpClient? videoHttpClient;
         private VideoPlayerForm? videoPlayerForm;
 
+        // Camera options
+        private static readonly string[] CameraOptions = { "hd", "uc60" };
+
         // Steps per second values corresponding to trackbar positions
         private readonly int[] stepsPerSecondValues = { 3, 10, 100, 1000, 10000 };
 
         public TelescopeControlForm(SerialPort? port, string? serverUrl, string portName)
         {
             InitializeComponent();
+
+            // Initialize camera ComboBoxes
+            cmbPrimaryCamera.Items.AddRange(CameraOptions);
+            cmbSecondaryCamera.Items.AddRange(CameraOptions);
+            cmbPrimaryCamera.SelectedIndex = 0;   // default: hd
+            cmbSecondaryCamera.SelectedIndex = 1;  // default: uc60
+            cmbPrimaryCamera.SelectedIndexChanged += CmbCamera_SelectedIndexChanged;
+            cmbSecondaryCamera.SelectedIndexChanged += CmbCamera_SelectedIndexChanged;
 
             if (serverUrl != null)
             {
@@ -121,6 +132,17 @@ namespace TelescopeWatcher
             UpdateFocusSpeedDisplay();
         }
 
+        private string SelectedPrimaryCamera => cmbPrimaryCamera.SelectedItem?.ToString() ?? "hd";
+        private string SelectedSecondaryCamera => cmbSecondaryCamera.SelectedItem?.ToString() ?? "uc60";
+
+        private void CmbCamera_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (cmbPrimaryCamera.SelectedItem?.ToString() == cmbSecondaryCamera.SelectedItem?.ToString())
+            {
+                AddLogMessage("Warning: Primary and Secondary cameras are set to the same device!");
+            }
+        }
+
         private void OnStepsPerSecondChanged(object? sender, EventArgs e)
         {
             if (this.InvokeRequired)
@@ -205,16 +227,27 @@ namespace TelescopeWatcher
                 return;
             }
 
+            string primaryCam = SelectedPrimaryCamera;
+            string secondaryCam = SelectedSecondaryCamera;
+
+            if (primaryCam == secondaryCam)
+            {
+                MessageBox.Show("Primary and Secondary cameras cannot be the same.\nPlease select different cameras.",
+                    "Camera Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             try
             {
                 btnVideoStart.Enabled = false;
-                AddLogMessage("Starting video streams...");
+                cmbPrimaryCamera.Enabled = false;
+                cmbSecondaryCamera.Enabled = false;
+                AddLogMessage($"Starting video streams... Primary: {primaryCam}, Secondary: {secondaryCam}");
 
                 var uri = new Uri(videoServerUrl);
                 
-                // Start both video streams via unified server
-                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/hd/start");
-                var response2Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/uc60/start");
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/{primaryCam}/start");
+                var response2Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/{secondaryCam}/start");
 
                 var response1 = await response1Task;
                 var response2 = await response2Task;
@@ -227,20 +260,19 @@ namespace TelescopeWatcher
                     AddLogMessage("Both video streams started successfully");
                     UpdateVideoStatus(true, "Streaming");
 
-                    // Open video player window
                     if (videoPlayerForm == null || videoPlayerForm.IsDisposed)
                     {
                         try
                         {
                             string baseUrl = $"{uri.Scheme}://{uri.Host}";
 
-                            // Get current steps per second from shared settings
                             var settings = TelescopeSettings.Instance;
                             int stepsPerSecond = settings.StepsPerSecond;
 
-                            // Pass telescope control dependencies to video player
                             videoPlayerForm = new VideoPlayerForm(
                                 baseUrl, 
+                                primaryCam,
+                                secondaryCam,
                                 serialPort, 
                                 serverClient, 
                                 stepsPerSecond, 
@@ -251,6 +283,8 @@ namespace TelescopeWatcher
                             videoPlayerForm.FormClosed += (s, args) =>
                             {
                                 videoPlayerForm = null;
+                                cmbPrimaryCamera.Enabled = true;
+                                cmbSecondaryCamera.Enabled = true;
                                 AddLogMessage("Video player window closed");
                             };
 
@@ -259,6 +293,8 @@ namespace TelescopeWatcher
                         catch (Exception ex)
                         {
                             AddLogMessage($"Error opening video player: {ex.Message}");
+                            cmbPrimaryCamera.Enabled = true;
+                            cmbSecondaryCamera.Enabled = true;
                             MessageBox.Show($"Failed to open video player:\n\n{ex.Message}",
                                 "Video Player Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
@@ -275,23 +311,23 @@ namespace TelescopeWatcher
                     if (!mainSuccess)
                     {
                         string mainError = await response1.Content.ReadAsStringAsync();
-                        error += $"HD Camera (/cam/hd): {mainError}\n";
-                        AddLogMessage($"Failed to start HD camera: {mainError}");
+                        error += $"{primaryCam.ToUpper()} Camera (/cam/{primaryCam}): {mainError}\n";
+                        AddLogMessage($"Failed to start {primaryCam.ToUpper()} camera: {mainError}");
                     }
                     else
                     {
-                        AddLogMessage("HD camera started successfully");
+                        AddLogMessage($"{primaryCam.ToUpper()} camera started successfully");
                     }
 
                     if (!secondarySuccess)
                     {
                         string secondaryError = await response2.Content.ReadAsStringAsync();
-                        error += $"UC60 Camera (/cam/uc60): {secondaryError}";
-                        AddLogMessage($"Failed to start UC60 camera: {secondaryError}");
+                        error += $"{secondaryCam.ToUpper()} Camera (/cam/{secondaryCam}): {secondaryError}";
+                        AddLogMessage($"Failed to start {secondaryCam.ToUpper()} camera: {secondaryError}");
                     }
                     else
                     {
-                        AddLogMessage("UC60 camera started successfully");
+                        AddLogMessage($"{secondaryCam.ToUpper()} camera started successfully");
                     }
 
                     if (!string.IsNullOrEmpty(error))
@@ -309,13 +345,13 @@ namespace TelescopeWatcher
                             {
                                 string baseUrl = $"{uri.Scheme}://{uri.Host}";
                                 
-                                // Get current steps per second from shared settings
                                 var settings = TelescopeSettings.Instance;
                                 int stepsPerSecond = settings.StepsPerSecond;
                                 
-                                // Pass telescope control dependencies to video player
                                 videoPlayerForm = new VideoPlayerForm(
                                     baseUrl, 
+                                    primaryCam,
+                                    secondaryCam,
                                     serialPort, 
                                     serverClient, 
                                     stepsPerSecond, 
@@ -326,14 +362,23 @@ namespace TelescopeWatcher
                                 videoPlayerForm.FormClosed += (s, args) =>
                                 {
                                     videoPlayerForm = null;
+                                    cmbPrimaryCamera.Enabled = true;
+                                    cmbSecondaryCamera.Enabled = true;
                                     AddLogMessage("Video player window closed");
                                 };
                             }
                             catch (Exception ex)
                             {
                                 AddLogMessage($"Error opening video player: {ex.Message}");
+                                cmbPrimaryCamera.Enabled = true;
+                                cmbSecondaryCamera.Enabled = true;
                             }
                         }
+                    }
+                    else
+                    {
+                        cmbPrimaryCamera.Enabled = true;
+                        cmbSecondaryCamera.Enabled = true;
                     }
                 }
             }
@@ -341,12 +386,16 @@ namespace TelescopeWatcher
             {
                 AddLogMessage("Video start request timed out");
                 UpdateVideoStatus(false, "Timeout");
+                cmbPrimaryCamera.Enabled = true;
+                cmbSecondaryCamera.Enabled = true;
                 MessageBox.Show("Video start request timed out.\n\nThe server may be busy or unreachable.",
                     "Timeout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
             {
                 AddLogMessage($"Error starting video streams: {ex.Message}");
+                cmbPrimaryCamera.Enabled = true;
+                cmbSecondaryCamera.Enabled = true;
                 MessageBox.Show($"Error starting video streams:\n\n{ex.Message}",
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -364,12 +413,14 @@ namespace TelescopeWatcher
                 return;
             }
 
+            string primaryCam = SelectedPrimaryCamera;
+            string secondaryCam = SelectedSecondaryCamera;
+
             try
             {
                 btnVideoStop.Enabled = false;
                 AddLogMessage("Stopping video streams...");
 
-                // Close video player window if open
                 if (videoPlayerForm != null && !videoPlayerForm.IsDisposed)
                 {
                     videoPlayerForm.Close();
@@ -377,9 +428,8 @@ namespace TelescopeWatcher
                     AddLogMessage("Video player window closed");
                 }
 
-                // Stop both video servers
-                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/hd/stop");
-                var response2Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/uc60/stop");
+                var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/{primaryCam}/stop");
+                var response2Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/{secondaryCam}/stop");
 
                 var response1 = await response1Task;
                 var response2 = await response2Task;
@@ -397,21 +447,21 @@ namespace TelescopeWatcher
                     if (!mainSuccess)
                     {
                         string error = await response1.Content.ReadAsStringAsync();
-                        AddLogMessage($"Failed to stop HD camera: {error}");
+                        AddLogMessage($"Failed to stop {primaryCam.ToUpper()} camera: {error}");
                     }
                     else
                     {
-                        AddLogMessage("HD camera stopped successfully");
+                        AddLogMessage($"{primaryCam.ToUpper()} camera stopped successfully");
                     }
 
                     if (!secondarySuccess)
                     {
                         string error = await response2.Content.ReadAsStringAsync();
-                        AddLogMessage($"Failed to stop UC60 camera: {error}");
+                        AddLogMessage($"Failed to stop {secondaryCam.ToUpper()} camera: {error}");
                     }
                     else
                     {
-                        AddLogMessage("UC60 camera stopped successfully");
+                        AddLogMessage($"{secondaryCam.ToUpper()} camera stopped successfully");
                     }
                 }
             }
@@ -427,6 +477,8 @@ namespace TelescopeWatcher
             finally
             {
                 btnVideoStop.Enabled = true;
+                cmbPrimaryCamera.Enabled = true;
+                cmbSecondaryCamera.Enabled = true;
             }
         }
 
