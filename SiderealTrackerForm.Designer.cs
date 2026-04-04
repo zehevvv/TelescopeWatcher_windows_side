@@ -33,6 +33,7 @@ namespace TelescopeWatcher
             this.lblLon = new System.Windows.Forms.Label();
             this.txtLon = new System.Windows.Forms.TextBox();
             this.lblLonHint = new System.Windows.Forms.Label();
+            this.btnGetLocation = new System.Windows.Forms.Button();
             this.lblInterval = new System.Windows.Forms.Label();
             this.txtInterval = new System.Windows.Forms.TextBox();
             this.lblIntervalHint = new System.Windows.Forms.Label();
@@ -106,7 +107,7 @@ namespace TelescopeWatcher
             this.btnUseSelected.Enabled = false;
             this.btnUseSelected.Click += new System.EventHandler(this.BtnUseSelected_Click);
             //
-            // grpParams  (right column, x=254, w=390, h=215)
+            // grpParams  (right column, x=254, w=390, h=255 — grown by 30px for btnGetLocation)
             //
             this.grpParams.Controls.Add(this.lblRA);
             this.grpParams.Controls.Add(this.txtRA);
@@ -120,13 +121,14 @@ namespace TelescopeWatcher
             this.grpParams.Controls.Add(this.lblLon);
             this.grpParams.Controls.Add(this.txtLon);
             this.grpParams.Controls.Add(this.lblLonHint);
+            this.grpParams.Controls.Add(this.btnGetLocation);
             this.grpParams.Controls.Add(this.lblInterval);
             this.grpParams.Controls.Add(this.txtInterval);
             this.grpParams.Controls.Add(this.lblIntervalHint);
             this.grpParams.Controls.Add(this.lblRaDecClock);
             this.grpParams.Location = new System.Drawing.Point(254, 12);
             this.grpParams.Name = "grpParams";
-            this.grpParams.Size = new System.Drawing.Size(390, 225);
+            this.grpParams.Size = new System.Drawing.Size(390, 260);
             this.grpParams.TabIndex = 0;
             this.grpParams.TabStop = false;
             this.grpParams.Text = "Tracking Parameters";
@@ -179,7 +181,7 @@ namespace TelescopeWatcher
             this.txtLat.Name = "txtLat";
             this.txtLat.Size = new System.Drawing.Size(110, 23);
             this.txtLat.TabIndex = 2;
-            this.txtLat.Text = "0.0";
+            this.txtLat.Text = "32.2667";
             // lblLatHint
             this.lblLatHint.AutoSize = true;
             this.lblLatHint.ForeColor = System.Drawing.Color.Gray;
@@ -196,28 +198,37 @@ namespace TelescopeWatcher
             this.txtLon.Name = "txtLon";
             this.txtLon.Size = new System.Drawing.Size(110, 23);
             this.txtLon.TabIndex = 3;
-            this.txtLon.Text = "0.0";
+            this.txtLon.Text = "34.8833";
             // lblLonHint
             this.lblLonHint.AutoSize = true;
             this.lblLonHint.ForeColor = System.Drawing.Color.Gray;
             this.lblLonHint.Location = new System.Drawing.Point(268, 130);
             this.lblLonHint.Name = "lblLonHint";
             this.lblLonHint.Text = "-180 – +180°";
+            // btnGetLocation
+            this.btnGetLocation.Location = new System.Drawing.Point(8, 157);
+            this.btnGetLocation.Name = "btnGetLocation";
+            this.btnGetLocation.Size = new System.Drawing.Size(254, 26);
+            this.btnGetLocation.TabIndex = 4;
+            this.btnGetLocation.Text = "Get My Location (via Internet)";
+            this.btnGetLocation.UseVisualStyleBackColor = true;
+            this.btnGetLocation.Enabled = false;
+            this.btnGetLocation.Click += new System.EventHandler(this.BtnGetLocation_Click);
             // lblInterval
             this.lblInterval.AutoSize = true;
-            this.lblInterval.Location = new System.Drawing.Point(8, 164);
+            this.lblInterval.Location = new System.Drawing.Point(8, 196);
             this.lblInterval.Name = "lblInterval";
             this.lblInterval.Text = "Update Interval:";
             // txtInterval
-            this.txtInterval.Location = new System.Drawing.Point(152, 161);
+            this.txtInterval.Location = new System.Drawing.Point(152, 193);
             this.txtInterval.Name = "txtInterval";
             this.txtInterval.Size = new System.Drawing.Size(110, 23);
-            this.txtInterval.TabIndex = 4;
+            this.txtInterval.TabIndex = 5;
             this.txtInterval.Text = "5.0";
             // lblIntervalHint
             this.lblIntervalHint.AutoSize = true;
             this.lblIntervalHint.ForeColor = System.Drawing.Color.Gray;
-            this.lblIntervalHint.Location = new System.Drawing.Point(268, 164);
+            this.lblIntervalHint.Location = new System.Drawing.Point(268, 196);
             this.lblIntervalHint.Name = "lblIntervalHint";
             this.lblIntervalHint.Text = "seconds, > 0";
             //
@@ -226,18 +237,18 @@ namespace TelescopeWatcher
             this.lblRaDecClock.AutoSize = false;
             this.lblRaDecClock.Font = new System.Drawing.Font("Consolas", 9.5F, System.Drawing.FontStyle.Bold);
             this.lblRaDecClock.ForeColor = System.Drawing.Color.SteelBlue;
-            this.lblRaDecClock.Location = new System.Drawing.Point(8, 195);
+            this.lblRaDecClock.Location = new System.Drawing.Point(8, 230);
             this.lblRaDecClock.Name = "lblRaDecClock";
             this.lblRaDecClock.Size = new System.Drawing.Size(372, 20);
             this.lblRaDecClock.Text = "";
             this.lblRaDecClock.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
-            // pnlButtons  (shifted down 25 px to make room for taller grpParams)
+            // pnlButtons  (shifted down to match grown grpParams)
             //
             this.pnlButtons.Controls.Add(this.btnStart);
             this.pnlButtons.Controls.Add(this.btnStop);
             this.pnlButtons.Controls.Add(this.btnStatus);
-            this.pnlButtons.Location = new System.Drawing.Point(254, 245);
+            this.pnlButtons.Location = new System.Drawing.Point(254, 280);
             this.pnlButtons.Name = "pnlButtons";
             this.pnlButtons.Size = new System.Drawing.Size(390, 40);
             this.pnlButtons.TabIndex = 1;
@@ -274,12 +285,12 @@ namespace TelescopeWatcher
             this.btnStatus.UseVisualStyleBackColor = true;
             this.btnStatus.Click += new System.EventHandler(this.BtnStatus_Click);
             //
-            // lblActiveStatus  (shifted down 25 px)
+            // lblActiveStatus  (shifted down to match)
             //
             this.lblActiveStatus.AutoSize = false;
             this.lblActiveStatus.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.lblActiveStatus.ForeColor = System.Drawing.Color.DarkRed;
-            this.lblActiveStatus.Location = new System.Drawing.Point(254, 288);
+            this.lblActiveStatus.Location = new System.Drawing.Point(254, 323);
             this.lblActiveStatus.Name = "lblActiveStatus";
             this.lblActiveStatus.Size = new System.Drawing.Size(390, 20);
             this.lblActiveStatus.TabIndex = 2;
@@ -338,6 +349,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblLon;
         private System.Windows.Forms.TextBox txtLon;
         private System.Windows.Forms.Label lblLonHint;
+        private System.Windows.Forms.Button btnGetLocation;
         private System.Windows.Forms.Label lblInterval;
         private System.Windows.Forms.TextBox txtInterval;
         private System.Windows.Forms.Label lblIntervalHint;

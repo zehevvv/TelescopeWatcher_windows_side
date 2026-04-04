@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Net.NetworkInformation;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -35,6 +36,8 @@ namespace TelescopeWatcher
             statusTimer.Interval = 2000;
             statusTimer.Tick += StatusTimer_Tick;
             statusTimer.Start();
+
+            UpdateGetLocationButton();
 
             this.FormClosing += SiderealTrackerForm_FormClosing;
         }
@@ -191,7 +194,72 @@ namespace TelescopeWatcher
 
         private async void StatusTimer_Tick(object? sender, EventArgs e)
         {
+            UpdateGetLocationButton();
             await RefreshStatusAsync(silent: true);
+        }
+
+        // ??????????????????????????????????????????????????????????????
+        // Location helpers
+        // ??????????????????????????????????????????????????????????????
+
+        private static bool IsInternetAvailable()
+        {
+            return NetworkInterface.GetIsNetworkAvailable() &&
+                   NetworkInterface.GetAllNetworkInterfaces()
+                       .Any(n => n.OperationalStatus == OperationalStatus.Up
+                              && n.NetworkInterfaceType != NetworkInterfaceType.Loopback
+                              && n.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
+        }
+
+        private void UpdateGetLocationButton()
+        {
+            bool online = IsInternetAvailable();
+            if (btnGetLocation.InvokeRequired)
+                btnGetLocation.Invoke(new Action(() => btnGetLocation.Enabled = online));
+            else
+                btnGetLocation.Enabled = online;
+        }
+
+        private async void BtnGetLocation_Click(object? sender, EventArgs e)
+        {
+            btnGetLocation.Enabled = false;
+            btnGetLocation.Text = "Locating…";
+            try
+            {
+                // ip-api.com returns JSON with lat/lon based on the public IP; no API key needed
+                string json = await httpClient.GetStringAsync("http://ip-api.com/json/?fields=status,lat,lon,city,country");
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("status", out var status) && status.GetString() == "success"
+                    && root.TryGetProperty("lat", out var latEl)
+                    && root.TryGetProperty("lon", out var lonEl))
+                {
+                    double lat = latEl.GetDouble();
+                    double lon = lonEl.GetDouble();
+
+                    string city = root.TryGetProperty("city", out var cityEl) ? cityEl.GetString() ?? "" : "";
+                    string country = root.TryGetProperty("country", out var countryEl) ? countryEl.GetString() ?? "" : "";
+
+                    txtLat.Text = lat.ToString("F4", CultureInfo.InvariantCulture);
+                    txtLon.Text = lon.ToString("F4", CultureInfo.InvariantCulture);
+
+                    AppendOutput($"Location detected: {city}, {country}  ?  Lat={lat:F4}°, Lon={lon:F4}°");
+                }
+                else
+                {
+                    AppendOutput("Could not determine location from IP.");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendOutput($"Location lookup failed: {ex.Message}");
+            }
+            finally
+            {
+                btnGetLocation.Text = "Get My Location (via Internet)";
+                UpdateGetLocationButton();
+            }
         }
 
         private async Task RefreshStatusAsync(bool silent = false)
