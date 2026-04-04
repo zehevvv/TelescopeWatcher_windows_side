@@ -101,7 +101,7 @@ namespace TelescopeWatcher
             this.btnUseSelected.Name = "btnUseSelected";
             this.btnUseSelected.Size = new System.Drawing.Size(212, 30);
             this.btnUseSelected.TabIndex = 2;
-            this.btnUseSelected.Text = "?  Use Selected  (fill RA / Dec)";
+            this.btnUseSelected.Text = "Use Selected  (fill RA / Dec)";
             this.btnUseSelected.UseVisualStyleBackColor = false;
             this.btnUseSelected.Enabled = false;
             this.btnUseSelected.Click += new System.EventHandler(this.BtnUseSelected_Click);
@@ -250,7 +250,7 @@ namespace TelescopeWatcher
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(120, 35);
             this.btnStart.TabIndex = 0;
-            this.btnStart.Text = "?  Start";
+            this.btnStart.Text = "Start";
             this.btnStart.UseVisualStyleBackColor = false;
             this.btnStart.Click += new System.EventHandler(this.BtnStart_Click);
             // btnStop
@@ -262,7 +262,7 @@ namespace TelescopeWatcher
             this.btnStop.Name = "btnStop";
             this.btnStop.Size = new System.Drawing.Size(120, 35);
             this.btnStop.TabIndex = 1;
-            this.btnStop.Text = "?  Stop";
+            this.btnStop.Text = "Stop";
             this.btnStop.UseVisualStyleBackColor = false;
             this.btnStop.Click += new System.EventHandler(this.BtnStop_Click);
             // btnStatus
