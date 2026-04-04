@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CosineKitty.AstronomyEngine" Version="2.1.19" />
     <PackageReference Include="LibVLCSharp" Version="3.9.1" />
     <PackageReference Include="LibVLCSharp.WinForms" Version="3.9.1" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3719.77" />

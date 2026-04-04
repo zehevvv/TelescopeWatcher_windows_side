@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -15,10 +18,18 @@ namespace TelescopeWatcher
         };
         private System.Windows.Forms.Timer statusTimer;
 
+        // Filtered list backing the ListBox
+        private List<CelestialObject> _filteredObjects = new();
+
         public SiderealTrackerForm(string serverUrl)
         {
             InitializeComponent();
             this.serverBaseUrl = serverUrl;
+
+            PopulateCatalog("");
+
+            // Trigger the clock label with the default 0.0 / 0.0 values
+            TxtRADec_TextChanged(null, EventArgs.Empty);
 
             statusTimer = new System.Windows.Forms.Timer();
             statusTimer.Interval = 2000;
@@ -27,6 +38,150 @@ namespace TelescopeWatcher
 
             this.FormClosing += SiderealTrackerForm_FormClosing;
         }
+
+        // ??????????????????????????????????????????????????????????????
+        // Catalog helpers
+        // ??????????????????????????????????????????????????????????????
+
+        private void PopulateCatalog(string search)
+        {
+            _filteredObjects = CelestialCatalog.Search(search).ToList();
+
+            lstObjects.BeginUpdate();
+            lstObjects.Items.Clear();
+            foreach (var obj in _filteredObjects)
+            {
+                // Format: "[Type] Name (Alternate)"
+                lstObjects.Items.Add($"[{obj.TypeTag,-4}]  {obj.DisplayName}");
+            }
+            lstObjects.EndUpdate();
+
+            btnUseSelected.Enabled = false;
+            lblObjectInfo.Text = _filteredObjects.Count == 0
+                ? "No matches found."
+                : $"{_filteredObjects.Count} object(s)";
+        }
+
+        private void TxtSearch_TextChanged(object? sender, EventArgs e)
+        {
+            PopulateCatalog(txtSearch.Text);
+        }
+
+        /// <summary>
+        /// Converts a decimal RA/Dec value to sexagesimal clock format and updates lblRaDecClock.
+        /// Called whenever txtRA or txtDec changes.
+        /// </summary>
+        private void TxtRADec_TextChanged(object? sender, EventArgs e)
+        {
+            bool raOk  = double.TryParse(txtRA.Text.Trim(),  System.Globalization.NumberStyles.Float,
+                             System.Globalization.CultureInfo.InvariantCulture, out double ra)
+                         && ra >= 0 && ra < 24;
+            bool decOk = double.TryParse(txtDec.Text.Trim(), System.Globalization.NumberStyles.Float,
+                             System.Globalization.CultureInfo.InvariantCulture, out double dec)
+                         && dec >= -90 && dec <= 90;
+
+            if (raOk && decOk)
+            {
+                lblRaDecClock.Text = $"RA  {ToHms(ra)}    Dec  {ToDms(dec)}";
+                lblRaDecClock.ForeColor = System.Drawing.Color.SteelBlue;
+            }
+            else
+            {
+                lblRaDecClock.Text = raOk || decOk ? "—" : "";
+                lblRaDecClock.ForeColor = System.Drawing.Color.Gray;
+            }
+        }
+
+        // "5.5756"  ?  "05h 34m 32s"
+        private static string ToHms(double hours)
+        {
+            hours = Math.Abs(hours);
+            int h  = (int)hours;
+            int m  = (int)((hours - h) * 60);
+            int s  = (int)(((hours - h) * 60 - m) * 60);
+            return $"{h:D2}h {m:D2}m {s:D2}s";
+        }
+
+        // "22.8453"  ?  "+22° 50' 43""
+        private static string ToDms(double degrees)
+        {
+            char sign = degrees >= 0 ? '+' : '-';
+            degrees = Math.Abs(degrees);
+            int d  = (int)degrees;
+            int m  = (int)((degrees - d) * 60);
+            int s  = (int)(((degrees - d) * 60 - m) * 60);
+            return $"{sign}{d:D2}° {m:D2}' {s:D2}\"";
+        }
+
+        private void LstObjects_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            int idx = lstObjects.SelectedIndex;
+            if (idx < 0 || idx >= _filteredObjects.Count)
+            {
+                lblObjectInfo.Text = "";
+                btnUseSelected.Enabled = false;
+                return;
+            }
+
+            var obj = _filteredObjects[idx];
+
+            if (obj.IsLive)
+            {
+                try
+                {
+                    var (ra, dec) = obj.GetCurrentCoordinates();
+                    lblObjectInfo.Text =
+                        $"{obj.DisplayName}  ? live\n" +
+                        $"Type : {obj.Type}\n" +
+                        $"RA   : {ra:F4} h  (now)\n" +
+                        $"Dec  : {dec:+0.0000;-0.0000}°  (now)";
+                }
+                catch (Exception ex)
+                {
+                    lblObjectInfo.Text = $"Error computing position:\n{ex.Message}";
+                }
+            }
+            else
+            {
+                lblObjectInfo.Text =
+                    $"{obj.DisplayName}\n" +
+                    $"Type : {obj.Type}\n" +
+                    $"RA   : {obj.RA:F4} h\n" +
+                    $"Dec  : {obj.Dec:+0.0000;-0.0000}°";
+            }
+
+            btnUseSelected.Enabled = true;
+        }
+
+        private void LstObjects_DoubleClick(object? sender, EventArgs e)
+        {
+            BtnUseSelected_Click(sender, e);
+        }
+
+        private void BtnUseSelected_Click(object? sender, EventArgs e)
+        {
+            int idx = lstObjects.SelectedIndex;
+            if (idx < 0 || idx >= _filteredObjects.Count) return;
+
+            var obj = _filteredObjects[idx];
+            try
+            {
+                var (ra, dec) = obj.GetCurrentCoordinates();
+                txtRA.Text  = ra.ToString("F4", CultureInfo.InvariantCulture);
+                txtDec.Text = dec.ToString("F4", CultureInfo.InvariantCulture);
+
+                string liveNote = obj.IsLive ? " (live position)" : " (J2000)";
+                AppendOutput($"Loaded '{obj.DisplayName}'{liveNote} ? RA={ra:F4} h, Dec={dec:+0.0000;-0.0000}°");
+            }
+            catch (Exception ex)
+            {
+                AppendOutput($"Error getting coordinates for '{obj.DisplayName}': {ex.Message}");
+            }
+        }
+
+        // ??????????????????????????????????????????????????????????????
+        // Status polling
+        // ??????????????????????????????????????????????????????????????
 
         private void SiderealTrackerForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
@@ -103,6 +258,10 @@ namespace TelescopeWatcher
             txtOutput.AppendText($"[{DateTime.Now:HH:mm:ss}] {text}\r\n");
         }
 
+        // ??????????????????????????????????????????????????????????????
+        // Button handlers
+        // ??????????????????????????????????????????????????????????????
+
         private async void BtnStart_Click(object? sender, EventArgs e)
         {
             var errors = ValidateInputs(out double ra, out double dec, out double lat, out double lon, out double interval);
@@ -115,11 +274,11 @@ namespace TelescopeWatcher
             }
 
             string url = $"{serverBaseUrl}:5000/sidereal/start" +
-                         $"?ra={ra.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
-                         $"&dec={dec.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
-                         $"&lat={lat.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
-                         $"&lon={lon.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
-                         $"&interval={interval.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+                         $"?ra={ra.ToString(CultureInfo.InvariantCulture)}" +
+                         $"&dec={dec.ToString(CultureInfo.InvariantCulture)}" +
+                         $"&lat={lat.ToString(CultureInfo.InvariantCulture)}" +
+                         $"&lon={lon.ToString(CultureInfo.InvariantCulture)}" +
+                         $"&interval={interval.ToString(CultureInfo.InvariantCulture)}";
 
             AppendOutput($"Starting sidereal tracking (RA={ra}h, Dec={dec}°, Lat={lat}°, Lon={lon}°, Interval={interval}s)...");
             await SendGetRequest(url);
@@ -138,53 +297,48 @@ namespace TelescopeWatcher
             await RefreshStatusAsync(silent: false);
         }
 
-        /// <summary>
-        /// Validates all input fields. Populates out parameters only when valid.
-        /// Returns a list of error messages (empty = all valid).
-        /// </summary>
-        private List<string> ValidateInputs(out double ra, out double dec, out double lat, out double lon, out double interval)
+        // ??????????????????????????????????????????????????????????????
+        // Validation
+        // ??????????????????????????????????????????????????????????????
+
+        private List<string> ValidateInputs(out double ra, out double dec,
+                                            out double lat, out double lon, out double interval)
         {
             ra = dec = lat = lon = 0;
             interval = 5.0;
             var errors = new List<string>();
 
-            // RA: decimal hours, 0 – 24
-            if (!double.TryParse(txtRA.Text.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out ra))
+            if (!double.TryParse(txtRA.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out ra))
                 errors.Add("Right Ascension (RA) must be a decimal number (e.g. 5.575).");
             else if (ra < 0 || ra >= 24)
                 errors.Add("Right Ascension (RA) must be in the range 0 – 24 hours.");
 
-            // Dec: degrees, -90 – +90
-            if (!double.TryParse(txtDec.Text.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out dec))
+            if (!double.TryParse(txtDec.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out dec))
                 errors.Add("Declination (Dec) must be a decimal number (e.g. -5.39).");
             else if (dec < -90 || dec > 90)
                 errors.Add("Declination (Dec) must be in the range -90 – +90 degrees.");
 
-            // Latitude: -90 – +90
-            if (!double.TryParse(txtLat.Text.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out lat))
+            if (!double.TryParse(txtLat.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out lat))
                 errors.Add("Observer Latitude must be a decimal number (e.g. 32.08).");
             else if (lat < -90 || lat > 90)
                 errors.Add("Observer Latitude must be in the range -90 – +90 degrees.");
 
-            // Longitude: -180 – +180
-            if (!double.TryParse(txtLon.Text.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out lon))
+            if (!double.TryParse(txtLon.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out lon))
                 errors.Add("Observer Longitude must be a decimal number (e.g. 34.78).");
             else if (lon < -180 || lon > 180)
                 errors.Add("Observer Longitude must be in the range -180 – +180 degrees.");
 
-            // Update interval: > 0
-            if (!double.TryParse(txtInterval.Text.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out interval))
+            if (!double.TryParse(txtInterval.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out interval))
                 errors.Add("Update Interval must be a positive decimal number (e.g. 5.0).");
             else if (interval <= 0)
                 errors.Add("Update Interval must be greater than 0 seconds.");
 
             return errors;
         }
+
+        // ??????????????????????????????????????????????????????????????
+        // HTTP
+        // ??????????????????????????????????????????????????????????????
 
         private async Task SendGetRequest(string url)
         {
@@ -195,7 +349,6 @@ namespace TelescopeWatcher
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // Try to pretty-print if JSON, otherwise show raw text
                     try
                     {
                         var parsed = JsonSerializer.Deserialize<JsonElement>(body);
@@ -212,7 +365,6 @@ namespace TelescopeWatcher
                     AppendOutput($"Error {(int)response.StatusCode} ({response.StatusCode}): {body}");
                 }
 
-                // Refresh status after any command
                 await RefreshStatusAsync(silent: true);
             }
             catch (Exception ex)
