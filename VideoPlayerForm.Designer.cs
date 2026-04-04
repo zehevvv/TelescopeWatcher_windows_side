@@ -36,6 +36,7 @@ namespace TelescopeWatcher
             this.toolsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.plateSolverToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.starFollowerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.siderealTrackerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.pictureBox2 = new System.Windows.Forms.PictureBox();
             this.videoPanel = new System.Windows.Forms.Panel();
@@ -119,7 +120,8 @@ namespace TelescopeWatcher
             // 
             this.toolsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.plateSolverToolStripMenuItem,
-            this.starFollowerToolStripMenuItem});
+            this.starFollowerToolStripMenuItem,
+            this.siderealTrackerToolStripMenuItem});
             this.toolsToolStripMenuItem.Name = "toolsToolStripMenuItem";
             this.toolsToolStripMenuItem.Size = new System.Drawing.Size(46, 20);
             this.toolsToolStripMenuItem.Text = "Tools";
@@ -137,6 +139,13 @@ namespace TelescopeWatcher
             this.starFollowerToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.starFollowerToolStripMenuItem.Text = "Star Follower";
             this.starFollowerToolStripMenuItem.Click += new System.EventHandler(this.StarFollowerToolStripMenuItem_Click);
+            // 
+            // siderealTrackerToolStripMenuItem
+            // 
+            this.siderealTrackerToolStripMenuItem.Name = "siderealTrackerToolStripMenuItem";
+            this.siderealTrackerToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.siderealTrackerToolStripMenuItem.Text = "Sidereal Tracker";
+            this.siderealTrackerToolStripMenuItem.Click += new System.EventHandler(this.SiderealTrackerToolStripMenuItem_Click);
             // 
             // pictureBox1
             // 
@@ -547,5 +556,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.ToolStripMenuItem toolsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem plateSolverToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem starFollowerToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem siderealTrackerToolStripMenuItem;
     }
 }

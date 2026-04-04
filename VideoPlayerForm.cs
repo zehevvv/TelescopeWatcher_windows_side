@@ -813,6 +813,19 @@ namespace TelescopeWatcher
             }
         }
 
+        private void SiderealTrackerToolStripMenuItem_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var form = new SiderealTrackerForm(serverBaseUrl);
+                form.Show(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening sidereal tracker: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         #region Keyboard Control Methods
 
         private void VideoPlayerForm_KeyDown(object? sender, KeyEventArgs e)
