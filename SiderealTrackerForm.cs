@@ -332,7 +332,7 @@ namespace TelescopeWatcher
 
         private async void BtnStart_Click(object? sender, EventArgs e)
         {
-            var errors = ValidateInputs(out double ra, out double dec, out double lat, out double lon, out double interval);
+            var errors = ValidateInputs(out double ra, out double dec, out double lat, out double lon, out double interval, out double speed);
             if (errors.Count > 0)
             {
                 MessageBox.Show(
@@ -346,9 +346,10 @@ namespace TelescopeWatcher
                          $"&dec={dec.ToString(CultureInfo.InvariantCulture)}" +
                          $"&lat={lat.ToString(CultureInfo.InvariantCulture)}" +
                          $"&lon={lon.ToString(CultureInfo.InvariantCulture)}" +
-                         $"&interval={interval.ToString(CultureInfo.InvariantCulture)}";
+                         $"&interval={interval.ToString(CultureInfo.InvariantCulture)}" +
+                         $"&speed={speed.ToString(CultureInfo.InvariantCulture)}";
 
-            AppendOutput($"Starting sidereal tracking (RA={ra}h, Dec={dec}°, Lat={lat}°, Lon={lon}°, Interval={interval}s)...");
+            AppendOutput($"Starting sidereal tracking (RA={ra}h, Dec={dec}°, Lat={lat}°, Lon={lon}°, Interval={interval}s, Speed={speed}x)...");
             await SendGetRequest(url);
         }
 
@@ -365,15 +366,32 @@ namespace TelescopeWatcher
             await RefreshStatusAsync(silent: false);
         }
 
+        private async void BtnSetSpeed_Click(object? sender, EventArgs e)
+        {
+            if (!double.TryParse(txtSpeed.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double speed)
+                || speed <= 0)
+            {
+                MessageBox.Show("Speed Factor must be a positive decimal number (e.g. 1.5).",
+                    "Invalid Speed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string url = $"{serverBaseUrl}:5000/sidereal/speed?factor={speed.ToString(CultureInfo.InvariantCulture)}";
+            AppendOutput($"Setting speed factor to {speed}x...");
+            await SendGetRequest(url);
+        }
+
         // ??????????????????????????????????????????????????????????????
         // Validation
         // ??????????????????????????????????????????????????????????????
 
         private List<string> ValidateInputs(out double ra, out double dec,
-                                            out double lat, out double lon, out double interval)
+                                            out double lat, out double lon, out double interval,
+                                            out double speed)
         {
             ra = dec = lat = lon = 0;
             interval = 5.0;
+            speed = 1.0;
             var errors = new List<string>();
 
             if (!double.TryParse(txtRA.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out ra))
@@ -400,6 +418,11 @@ namespace TelescopeWatcher
                 errors.Add("Update Interval must be a positive decimal number (e.g. 5.0).");
             else if (interval <= 0)
                 errors.Add("Update Interval must be greater than 0 seconds.");
+
+            if (!double.TryParse(txtSpeed.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out speed))
+                errors.Add("Speed Factor must be a positive decimal number (e.g. 1.5).");
+            else if (speed <= 0)
+                errors.Add("Speed Factor must be greater than 0.");
 
             return errors;
         }

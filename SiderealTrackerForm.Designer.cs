@@ -37,6 +37,10 @@ namespace TelescopeWatcher
             this.lblInterval = new System.Windows.Forms.Label();
             this.txtInterval = new System.Windows.Forms.TextBox();
             this.lblIntervalHint = new System.Windows.Forms.Label();
+            this.lblSpeed = new System.Windows.Forms.Label();
+            this.txtSpeed = new System.Windows.Forms.TextBox();
+            this.lblSpeedHint = new System.Windows.Forms.Label();
+            this.btnSetSpeed = new System.Windows.Forms.Button();
             this.pnlButtons = new System.Windows.Forms.Panel();
             this.btnStart = new System.Windows.Forms.Button();
             this.btnStop = new System.Windows.Forms.Button();
@@ -125,10 +129,13 @@ namespace TelescopeWatcher
             this.grpParams.Controls.Add(this.lblInterval);
             this.grpParams.Controls.Add(this.txtInterval);
             this.grpParams.Controls.Add(this.lblIntervalHint);
+            this.grpParams.Controls.Add(this.lblSpeed);
+            this.grpParams.Controls.Add(this.txtSpeed);
+            this.grpParams.Controls.Add(this.lblSpeedHint);
             this.grpParams.Controls.Add(this.lblRaDecClock);
             this.grpParams.Location = new System.Drawing.Point(254, 12);
             this.grpParams.Name = "grpParams";
-            this.grpParams.Size = new System.Drawing.Size(390, 260);
+            this.grpParams.Size = new System.Drawing.Size(390, 294);
             this.grpParams.TabIndex = 0;
             this.grpParams.TabStop = false;
             this.grpParams.Text = "Tracking Parameters";
@@ -231,13 +238,30 @@ namespace TelescopeWatcher
             this.lblIntervalHint.Location = new System.Drawing.Point(268, 196);
             this.lblIntervalHint.Name = "lblIntervalHint";
             this.lblIntervalHint.Text = "seconds, > 0";
+            // lblSpeed
+            this.lblSpeed.AutoSize = true;
+            this.lblSpeed.Location = new System.Drawing.Point(8, 230);
+            this.lblSpeed.Name = "lblSpeed";
+            this.lblSpeed.Text = "Speed Factor:";
+            // txtSpeed
+            this.txtSpeed.Location = new System.Drawing.Point(152, 227);
+            this.txtSpeed.Name = "txtSpeed";
+            this.txtSpeed.Size = new System.Drawing.Size(110, 23);
+            this.txtSpeed.TabIndex = 6;
+            this.txtSpeed.Text = "1.0";
+            // lblSpeedHint
+            this.lblSpeedHint.AutoSize = true;
+            this.lblSpeedHint.ForeColor = System.Drawing.Color.Gray;
+            this.lblSpeedHint.Location = new System.Drawing.Point(268, 230);
+            this.lblSpeedHint.Name = "lblSpeedHint";
+            this.lblSpeedHint.Text = "1.0 = sidereal";
             //
             // lblRaDecClock — sexagesimal preview, spans full width below RA/Dec rows
             //
             this.lblRaDecClock.AutoSize = false;
             this.lblRaDecClock.Font = new System.Drawing.Font("Consolas", 9.5F, System.Drawing.FontStyle.Bold);
             this.lblRaDecClock.ForeColor = System.Drawing.Color.SteelBlue;
-            this.lblRaDecClock.Location = new System.Drawing.Point(8, 230);
+            this.lblRaDecClock.Location = new System.Drawing.Point(8, 264);
             this.lblRaDecClock.Name = "lblRaDecClock";
             this.lblRaDecClock.Size = new System.Drawing.Size(372, 20);
             this.lblRaDecClock.Text = "";
@@ -248,7 +272,8 @@ namespace TelescopeWatcher
             this.pnlButtons.Controls.Add(this.btnStart);
             this.pnlButtons.Controls.Add(this.btnStop);
             this.pnlButtons.Controls.Add(this.btnStatus);
-            this.pnlButtons.Location = new System.Drawing.Point(254, 280);
+            this.pnlButtons.Controls.Add(this.btnSetSpeed);
+            this.pnlButtons.Location = new System.Drawing.Point(254, 314);
             this.pnlButtons.Name = "pnlButtons";
             this.pnlButtons.Size = new System.Drawing.Size(390, 40);
             this.pnlButtons.TabIndex = 1;
@@ -259,7 +284,7 @@ namespace TelescopeWatcher
             this.btnStart.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.btnStart.Location = new System.Drawing.Point(0, 0);
             this.btnStart.Name = "btnStart";
-            this.btnStart.Size = new System.Drawing.Size(120, 35);
+            this.btnStart.Size = new System.Drawing.Size(90, 35);
             this.btnStart.TabIndex = 0;
             this.btnStart.Text = "Start";
             this.btnStart.UseVisualStyleBackColor = false;
@@ -269,28 +294,36 @@ namespace TelescopeWatcher
             this.btnStop.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnStop.ForeColor = System.Drawing.Color.White;
             this.btnStop.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnStop.Location = new System.Drawing.Point(130, 0);
+            this.btnStop.Location = new System.Drawing.Point(98, 0);
             this.btnStop.Name = "btnStop";
-            this.btnStop.Size = new System.Drawing.Size(120, 35);
+            this.btnStop.Size = new System.Drawing.Size(90, 35);
             this.btnStop.TabIndex = 1;
             this.btnStop.Text = "Stop";
             this.btnStop.UseVisualStyleBackColor = false;
             this.btnStop.Click += new System.EventHandler(this.BtnStop_Click);
             // btnStatus
-            this.btnStatus.Location = new System.Drawing.Point(260, 0);
+            this.btnStatus.Location = new System.Drawing.Point(196, 0);
             this.btnStatus.Name = "btnStatus";
-            this.btnStatus.Size = new System.Drawing.Size(120, 35);
+            this.btnStatus.Size = new System.Drawing.Size(90, 35);
             this.btnStatus.TabIndex = 2;
             this.btnStatus.Text = "Get Status";
             this.btnStatus.UseVisualStyleBackColor = true;
             this.btnStatus.Click += new System.EventHandler(this.BtnStatus_Click);
+            // btnSetSpeed
+            this.btnSetSpeed.Location = new System.Drawing.Point(294, 0);
+            this.btnSetSpeed.Name = "btnSetSpeed";
+            this.btnSetSpeed.Size = new System.Drawing.Size(96, 35);
+            this.btnSetSpeed.TabIndex = 3;
+            this.btnSetSpeed.Text = "Set Speed";
+            this.btnSetSpeed.UseVisualStyleBackColor = true;
+            this.btnSetSpeed.Click += new System.EventHandler(this.BtnSetSpeed_Click);
             //
             // lblActiveStatus  (shifted down to match)
             //
             this.lblActiveStatus.AutoSize = false;
             this.lblActiveStatus.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.lblActiveStatus.ForeColor = System.Drawing.Color.DarkRed;
-            this.lblActiveStatus.Location = new System.Drawing.Point(254, 323);
+            this.lblActiveStatus.Location = new System.Drawing.Point(254, 357);
             this.lblActiveStatus.Name = "lblActiveStatus";
             this.lblActiveStatus.Size = new System.Drawing.Size(390, 20);
             this.lblActiveStatus.TabIndex = 2;
@@ -353,6 +386,10 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblInterval;
         private System.Windows.Forms.TextBox txtInterval;
         private System.Windows.Forms.Label lblIntervalHint;
+        private System.Windows.Forms.Label lblSpeed;
+        private System.Windows.Forms.TextBox txtSpeed;
+        private System.Windows.Forms.Label lblSpeedHint;
+        private System.Windows.Forms.Button btnSetSpeed;
         private System.Windows.Forms.Label lblRaDecClock;
         private System.Windows.Forms.Panel pnlButtons;
         private System.Windows.Forms.Button btnStart;
