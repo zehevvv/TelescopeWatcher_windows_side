@@ -1,5 +1,5 @@
 {
-  "CameraName": "hd",
+  "CameraName": "hd_usb_camera",
   "Controls": [
     {
       "name": "brightness",

@@ -70,7 +70,7 @@ namespace TelescopeWatcher
 
             try
             {
-                string url = $"{apiUrl}/cam/{cameraEndpoint}/controls";
+                string url = $"{apiUrl}/cam/controls?camera={cameraEndpoint}";
                 var response = await httpClient.GetStringAsync(url);
                 
                 var controls = JsonSerializer.Deserialize<List<CameraControl>>(response, new JsonSerializerOptions 
@@ -240,7 +240,7 @@ namespace TelescopeWatcher
             try
             {
                 lblStatus.Text = $"Setting {name} to {value}...";
-                string url = $"{apiUrl}/cam/{cameraEndpoint}/set_control?name={name}&value={value}";
+                string url = $"{apiUrl}/cam/set_control?camera={cameraEndpoint}&name={name}&value={value}";
                 var response = await httpClient.GetAsync(url);
                 
                 if (response.IsSuccessStatusCode)
@@ -264,7 +264,7 @@ namespace TelescopeWatcher
             try
             {
                 lblStatus.Text = "Resetting controls to defaults...";
-                string url = $"{apiUrl}/cam/{cameraEndpoint}/reset_controls";
+                string url = $"{apiUrl}/cam/reset_controls?camera={cameraEndpoint}";
                 var response = await httpClient.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
@@ -450,7 +450,7 @@ namespace TelescopeWatcher
                             foreach(var c in cameraControls)
                             {
                                 string val = c.Value?.ToString() ?? "";
-                                string url = $"{apiUrl}/cam/{cameraEndpoint}/set_control?name={c.Name}&value={val}";
+                            string url = $"{apiUrl}/cam/set_control?camera={cameraEndpoint}&name={c.Name}&value={val}";
                                 await httpClient.GetAsync(url);
                             }
                             

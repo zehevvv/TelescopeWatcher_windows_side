@@ -64,43 +64,16 @@ namespace TelescopeWatcher
 
         private Action<string>? logCallback;
 
-        // Camera name to port mapping
-        private static readonly Dictionary<string, int> CameraPortMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-        {
-            { "hd", 5001 },
-            { "uc60", 5002 }
-        };
-
-        private static int GetCameraPort(string cameraName)
-        {
-            if (CameraPortMap.TryGetValue(cameraName, out int port))
-                return port;
-            return 5001; // fallback
-        }
-
-        public VideoPlayerForm(string serverUrl, string primaryCamera, string secondaryCamera,
-                               SerialPort? port = null, SerialServerClient? client = null, 
+        public VideoPlayerForm(string serverUrl, string primaryCamera, string primaryStreamUrl,
+                               string secondaryCamera, string secondaryStreamUrl,
+                               SerialPort? port = null, SerialServerClient? client = null,
                                int stepsPerSecond = 1000, int focusMotorSpeed = 9, Action<string>? logCallback = null)
         {
             this.serverBaseUrl = serverUrl;
             this.primaryCameraName = primaryCamera;
             this.secondaryCameraName = secondaryCamera;
-            
-            try
-            {
-                var uri = new Uri(serverUrl);
-                int primaryPort = GetCameraPort(primaryCamera);
-                int secondaryPort = GetCameraPort(secondaryCamera);
-                this.mjpegUrl1 = $"{uri.Scheme}://{uri.Host}:{primaryPort}/?action=stream";
-                this.mjpegUrl2 = $"{uri.Scheme}://{uri.Host}:{secondaryPort}/?action=stream";
-            }
-            catch
-            {
-                int primaryPort = GetCameraPort(primaryCamera);
-                int secondaryPort = GetCameraPort(secondaryCamera);
-                this.mjpegUrl1 = $"{serverUrl}:{primaryPort}/?action=stream";
-                this.mjpegUrl2 = $"{serverUrl}:{secondaryPort}/?action=stream"; 
-            }
+            this.mjpegUrl1 = primaryStreamUrl;
+            this.mjpegUrl2 = secondaryStreamUrl;
             
             this.logCallback = logCallback;
             

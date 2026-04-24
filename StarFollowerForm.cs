@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -19,7 +20,7 @@ namespace TelescopeWatcher
         {
             InitializeComponent();
             this.serverBaseUrl = serverUrl;
-            cbCamera.SelectedIndex = 0; // Default to 'hd'
+            _ = LoadCameraListAsync();
 
             statusTimer = new System.Windows.Forms.Timer();
             statusTimer.Interval = 1000;
@@ -33,6 +34,38 @@ namespace TelescopeWatcher
         {
             statusTimer?.Stop();
             statusTimer?.Dispose();
+        }
+
+        private async Task LoadCameraListAsync()
+        {
+            try
+            {
+                string url = $"{serverBaseUrl}:5000/cam/list";
+                var response = await httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    string json = await response.Content.ReadAsStringAsync();
+                    var cameras = JsonSerializer.Deserialize<List<CameraInfo>>(json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (cameras != null && cameras.Count > 0)
+                    {
+                        if (cbCamera.InvokeRequired)
+                            cbCamera.Invoke(new Action(() => PopulateCameraCombo(cameras)));
+                        else
+                            PopulateCameraCombo(cameras);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void PopulateCameraCombo(List<CameraInfo> cameras)
+        {
+            cbCamera.Items.Clear();
+            foreach (var cam in cameras)
+                cbCamera.Items.Add(cam);
+            if (cameras.Count > 0)
+                cbCamera.SelectedIndex = 0;
         }
 
         private async void StatusTimer_Tick(object sender, EventArgs e)
@@ -99,7 +132,7 @@ namespace TelescopeWatcher
 
         private async void btnStart_Click(object sender, EventArgs e)
         {
-            string camera = cbCamera.SelectedItem?.ToString() ?? "hd";
+            string camera = (cbCamera.SelectedItem as CameraInfo)?.CameraId ?? "";
             float duration = (float)numDuration.Value;
             float threshold = (float)numThreshold.Value;
             string stepsCmd = Uri.EscapeDataString(txtStepsCmd.Text);
@@ -127,7 +160,7 @@ namespace TelescopeWatcher
 
         private async void btnDebug_Click(object sender, EventArgs e)
         {
-            string camera = cbCamera.SelectedItem?.ToString() ?? "hd";
+            string camera = (cbCamera.SelectedItem as CameraInfo)?.CameraId ?? "";
             string url = $"{serverBaseUrl}:5000/star_follower/debug_star?camera={camera}";
             AppendOutput($"Getting debug info for {camera}...");
             await SendGetRequest(url);

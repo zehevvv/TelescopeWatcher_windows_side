@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows.Forms;
@@ -17,12 +18,44 @@ namespace TelescopeWatcher
         {
             InitializeComponent();
             this.serverBaseUrl = serverUrl;
-            comboCamera.SelectedIndex = 0; // Default to "hd"
+            _ = LoadCameraListAsync();
+        }
+
+        private async System.Threading.Tasks.Task LoadCameraListAsync()
+        {
+            try
+            {
+                string listUrl = $"{serverBaseUrl}:5000/cam/list";
+                var response = await httpClient.GetAsync(listUrl);
+                if (response.IsSuccessStatusCode)
+                {
+                    string json = await response.Content.ReadAsStringAsync();
+                    var cameras = JsonSerializer.Deserialize<List<CameraInfo>>(json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (cameras != null && cameras.Count > 0)
+                    {
+                        if (comboCamera.InvokeRequired)
+                            comboCamera.Invoke(new Action(() => PopulateCameraCombo(cameras)));
+                        else
+                            PopulateCameraCombo(cameras);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void PopulateCameraCombo(List<CameraInfo> cameras)
+        {
+            comboCamera.Items.Clear();
+            foreach (var cam in cameras)
+                comboCamera.Items.Add(cam);
+            if (cameras.Count > 0)
+                comboCamera.SelectedIndex = 0;
         }
 
         private async void btnSolve_Click(object sender, EventArgs e)
         {
-            string selectedCamera = comboCamera.SelectedItem?.ToString() ?? "hd";
+            string selectedCamera = (comboCamera.SelectedItem as CameraInfo)?.CameraId ?? "";
             string url = $"{serverBaseUrl}:5000/cam/solve?camera={selectedCamera}";
 
             txtStatus.AppendText($"[{DateTime.Now:HH:mm:ss}] Solving for camera '{selectedCamera}'...\r\n");
