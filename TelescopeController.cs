@@ -65,7 +65,7 @@ namespace TelescopeWatcher
                 WriteCommand(directionCommand);
                 Thread.Sleep(50);
 
-                string timeCommand = TimeBetweenSteps == 0 ? "t=0.1" : $"t={TimeBetweenSteps}";
+                string timeCommand = TimeBetweenSteps == -1 ? "t=0.01" : (TimeBetweenSteps == 0 ? "t=0.1" : $"t={TimeBetweenSteps}");
                 WriteCommand(timeCommand);
                 Thread.Sleep(50);
 

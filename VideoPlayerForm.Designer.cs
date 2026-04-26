@@ -407,7 +407,7 @@ namespace TelescopeWatcher
             // 
             this.trackBarStepsPerSecond.LargeChange = 1;
             this.trackBarStepsPerSecond.Location = new System.Drawing.Point(10, 30);
-            this.trackBarStepsPerSecond.Maximum = 4;
+            this.trackBarStepsPerSecond.Maximum = 5;
             this.trackBarStepsPerSecond.Name = "trackBarStepsPerSecond";
             this.trackBarStepsPerSecond.Size = new System.Drawing.Size(300, 45);
             this.trackBarStepsPerSecond.TabIndex = 0;

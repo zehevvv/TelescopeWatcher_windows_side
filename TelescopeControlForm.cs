@@ -27,7 +27,7 @@ namespace TelescopeWatcher
         private VideoPlayerForm? videoPlayerForm;
 
         // Steps per second values corresponding to trackbar positions
-        private readonly int[] stepsPerSecondValues = { 3, 10, 100, 1000, 10000 };
+        private readonly int[] stepsPerSecondValues = { 3, 10, 100, 1000, 10000, 100000 };
 
         public TelescopeControlForm(SerialPort? port, string? serverUrl, string portName)
         {
@@ -653,7 +653,11 @@ namespace TelescopeWatcher
             // Update display labels
             lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/second";
 
-            if (stepsPerSecond == 10000)
+            if (stepsPerSecond == 100000)
+            {
+                lblTimeValue.Text = "(t=0.01 ms)";
+            }
+            else if (stepsPerSecond == 10000)
             {
                 lblTimeValue.Text = "(t=0.1 ms)";
             }
@@ -663,7 +667,8 @@ namespace TelescopeWatcher
                 lblTimeValue.Text = $"(t={timeMs:F1} ms)";
             }
 
-            AddLogMessage($"Speed set to {stepsPerSecond} steps/second (t={(stepsPerSecond == 10000 ? "0.1" : (1000.0 / stepsPerSecond).ToString("F1"))} ms)");
+            string timeStr = stepsPerSecond == 100000 ? "0.01" : (stepsPerSecond == 10000 ? "0.1" : (1000.0 / stepsPerSecond).ToString("F1"));
+            AddLogMessage($"Speed set to {stepsPerSecond} steps/second (t={timeStr} ms)");
         }
 
         private void TelescopeControlForm_KeyDown(object? sender, KeyEventArgs e)
@@ -1101,8 +1106,13 @@ namespace TelescopeWatcher
                 string timeCommand;
                 string timeDisplay;
 
-                // Handle special case for 10000 steps/second (t=0.1)
-                if (timeBetweenSteps == 0)
+                // Handle special cases for high step rates
+                if (timeBetweenSteps == -1)
+                {
+                    timeCommand = "t=0.01";
+                    timeDisplay = "0.01";
+                }
+                else if (timeBetweenSteps == 0)
                 {
                     timeCommand = "t=0.1";
                     timeDisplay = "0.1";

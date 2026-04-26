@@ -1,9 +1,5 @@
 using System.Net.Http;
-using System.Text;
 using System.IO.Ports;
-using System.Diagnostics;
-using Microsoft.Web.WebView2.WinForms;
-using Microsoft.Web.WebView2.Core;
 
 namespace TelescopeWatcher
 {
@@ -14,10 +10,6 @@ namespace TelescopeWatcher
         private readonly string secondaryCameraName;
         private readonly string mjpegUrl1;
         private readonly string mjpegUrl2;
-        private HttpClient? httpClient2;
-        private CancellationTokenSource? cancellationToken;
-        private Task? streamTask2;
-        private bool isStreaming = false;
         private int totalFrameCount1 = 0;
         private int totalFrameCount2 = 0;
         private int frameCount1 = 0;
@@ -51,7 +43,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
         private System.Windows.Forms.Timer fpsTimer;
-        private int lastDisplayedPictures = 0;
 
         // Latest Frame Synchronization
         private readonly object _lock1 = new object();
@@ -107,24 +98,15 @@ namespace TelescopeWatcher
             // Force default to 1000 and update trackbar/settings
             settings.StepsPerSecond = 1000;
             // Explicitly set trackbar value to match 1000 (Index 3)
-            // Indices: 0=3, 1=10, 2=100, 3=1000, 4=10000
+            // Indices: 0=3, 1=10, 2=100, 3=1000, 4=10000, 5=100000
             if (trackBarStepsPerSecond != null) trackBarStepsPerSecond.Value = 3;
 
             settings.FocusSpeed = focusMotorSpeed;
 
-            // Keep both PictureBoxes inside videoPanel for proper split layout
             if (this.videoPanel != null)
             {
                 this.videoPanel.Visible = true;
             }
-            
-            // Hide the old VideoView/Panel if it exists
-            if (this.videoPanel != null)
-            {
-                this.videoPanel.Visible = true; // KEEP visible now as it holds PictureBoxes
-            }
-            // Initialize Display logic
-            // (Removed WebView init code)
 
             // FIX: Anchor controls to Top|Right so they stay on the right side
             if (btnCircleSizeIncrease != null) btnCircleSizeIncrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -223,8 +205,9 @@ namespace TelescopeWatcher
         {
             var settings = TelescopeSettings.Instance;
             int stepsPerSecond = settings.StepsPerSecond;
-            double timeMs = stepsPerSecond == 10000 ? 0.1 : 1000.0 / stepsPerSecond;
-            lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/sec (t={timeMs:F1}ms)";
+            double timeMs = stepsPerSecond == 100000 ? 0.01 : (stepsPerSecond == 10000 ? 0.1 : 1000.0 / stepsPerSecond);
+            string timeFmt = stepsPerSecond == 100000 ? "0.01" : timeMs.ToString("F1");
+            lblStepsPerSecondValue.Text = $"{stepsPerSecond} steps/sec (t={timeFmt}ms)";
         }
 
         private void UpdateFocusSpeedDisplay()
@@ -644,7 +627,6 @@ namespace TelescopeWatcher
 
         private void FpsTimer_Tick(object? sender, EventArgs e)
         {
-            // FPS logic for main stream is not available with WebView2
         }
 
         private void BtnClose_Click(object? sender, EventArgs e)
@@ -665,12 +647,10 @@ namespace TelescopeWatcher
             
             mjpegClient1?.Dispose();
             mjpegClient2?.Dispose();
-            // webView?.Dispose(); // Removed
         }
 
         private void StopStreaming()
         {
-            isStreaming = false;
             mjpegClient1?.StopStreaming();
             mjpegClient2?.StopStreaming();
 

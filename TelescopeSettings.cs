@@ -15,7 +15,7 @@ namespace TelescopeWatcher
         private int _focusSpeed = 9;
 
         // Steps per second values corresponding to trackbar positions
-        public readonly int[] StepsPerSecondValues = { 3, 10, 100, 1000, 10000 };
+        public readonly int[] StepsPerSecondValues = { 3, 10, 100, 1000, 10000, 100000 };
 
         public event EventHandler? StepsPerSecondChanged;
         public event EventHandler? FocusSpeedChanged;
@@ -80,10 +80,15 @@ namespace TelescopeWatcher
             double timeMs = 1000.0 / _stepsPerSecond;
             _timeBetweenSteps = (int)Math.Round(timeMs);
 
-            // Special case for 10000 steps/second
+            // Special case for 10000 steps/second (t=0.1ms)
             if (_stepsPerSecond == 10000)
             {
                 _timeBetweenSteps = 0;
+            }
+            // Special case for 100000 steps/second (t=0.01ms)
+            else if (_stepsPerSecond == 100000)
+            {
+                _timeBetweenSteps = -1;
             }
         }
 
