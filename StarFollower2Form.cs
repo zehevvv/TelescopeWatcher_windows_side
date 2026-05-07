@@ -63,8 +63,8 @@ namespace TelescopeWatcher
 
             double duration  = (double)numDuration.Value;
             double threshold = (double)numThreshold.Value;
-            string stepsCmd  = txtStepsCmd.Text.Trim();
-            string speedCmd  = txtSpeedCmd.Text.Trim();
+            string stepsCmd  = $"s={(int)numStepsCmd.Value}";
+            string speedCmd  = $"t={(int)numSpeedCmd.Value}";
             bool usePrimary  = cbCamera.SelectedIndex == 0;
             string streamUrl = usePrimary ? _primaryStreamUrl : _secondaryStreamUrl;
 

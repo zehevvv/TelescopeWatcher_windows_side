@@ -18,9 +18,9 @@ namespace TelescopeWatcher
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.cbCamera = new System.Windows.Forms.ComboBox();
             this.label5 = new System.Windows.Forms.Label();
-            this.txtSpeedCmd = new System.Windows.Forms.TextBox();
+            this.numSpeedCmd = new System.Windows.Forms.NumericUpDown();
             this.label4 = new System.Windows.Forms.Label();
-            this.txtStepsCmd = new System.Windows.Forms.TextBox();
+            this.numStepsCmd = new System.Windows.Forms.NumericUpDown();
             this.label3 = new System.Windows.Forms.Label();
             this.numThreshold = new System.Windows.Forms.NumericUpDown();
             this.label2 = new System.Windows.Forms.Label();
@@ -32,6 +32,8 @@ namespace TelescopeWatcher
             this.txtOutput = new System.Windows.Forms.TextBox();
             this.lblActiveStatus = new System.Windows.Forms.Label();
             this.groupBox1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numSpeedCmd)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numStepsCmd)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numThreshold)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numDuration)).BeginInit();
             this.SuspendLayout();
@@ -40,9 +42,9 @@ namespace TelescopeWatcher
             // 
             this.groupBox1.Controls.Add(this.cbCamera);
             this.groupBox1.Controls.Add(this.label5);
-            this.groupBox1.Controls.Add(this.txtSpeedCmd);
+            this.groupBox1.Controls.Add(this.numSpeedCmd);
             this.groupBox1.Controls.Add(this.label4);
-            this.groupBox1.Controls.Add(this.txtStepsCmd);
+            this.groupBox1.Controls.Add(this.numStepsCmd);
             this.groupBox1.Controls.Add(this.label3);
             this.groupBox1.Controls.Add(this.numThreshold);
             this.groupBox1.Controls.Add(this.label2);
@@ -74,13 +76,15 @@ namespace TelescopeWatcher
             this.label5.TabIndex = 8;
             this.label5.Text = "Camera:";
             // 
-            // txtSpeedCmd
+            // numSpeedCmd
             // 
-            this.txtSpeedCmd.Location = new System.Drawing.Point(100, 110);
-            this.txtSpeedCmd.Name = "txtSpeedCmd";
-            this.txtSpeedCmd.Size = new System.Drawing.Size(120, 23);
-            this.txtSpeedCmd.TabIndex = 7;
-            this.txtSpeedCmd.Text = "t=100";
+            this.numSpeedCmd.Location = new System.Drawing.Point(100, 110);
+            this.numSpeedCmd.Maximum = new decimal(new int[] { 10000, 0, 0, 0 });
+            this.numSpeedCmd.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.numSpeedCmd.Name = "numSpeedCmd";
+            this.numSpeedCmd.Size = new System.Drawing.Size(120, 23);
+            this.numSpeedCmd.TabIndex = 7;
+            this.numSpeedCmd.Value = new decimal(new int[] { 100, 0, 0, 0 });
             // 
             // label4
             // 
@@ -89,15 +93,17 @@ namespace TelescopeWatcher
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(73, 15);
             this.label4.TabIndex = 6;
-            this.label4.Text = "Speed Cmd:";
+            this.label4.Text = "Speed:";
             // 
-            // txtStepsCmd
+            // numStepsCmd
             // 
-            this.txtStepsCmd.Location = new System.Drawing.Point(100, 80);
-            this.txtStepsCmd.Name = "txtStepsCmd";
-            this.txtStepsCmd.Size = new System.Drawing.Size(120, 23);
-            this.txtStepsCmd.TabIndex = 5;
-            this.txtStepsCmd.Text = "s=10";
+            this.numStepsCmd.Location = new System.Drawing.Point(100, 80);
+            this.numStepsCmd.Maximum = new decimal(new int[] { 100000, 0, 0, 0 });
+            this.numStepsCmd.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.numStepsCmd.Name = "numStepsCmd";
+            this.numStepsCmd.Size = new System.Drawing.Size(120, 23);
+            this.numStepsCmd.TabIndex = 5;
+            this.numStepsCmd.Value = new decimal(new int[] { 10, 0, 0, 0 });
             // 
             // label3
             // 
@@ -106,7 +112,7 @@ namespace TelescopeWatcher
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(68, 15);
             this.label3.TabIndex = 4;
-            this.label3.Text = "Steps Cmd:";
+            this.label3.Text = "Steps:";
             // 
             // numThreshold
             // 
@@ -215,6 +221,8 @@ namespace TelescopeWatcher
             this.Text = "Star Follower 2 (Local)";
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numSpeedCmd)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numStepsCmd)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numThreshold)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numDuration)).EndInit();
             this.ResumeLayout(false);
@@ -224,9 +232,9 @@ namespace TelescopeWatcher
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.ComboBox cbCamera;
         private System.Windows.Forms.Label label5;
-        private System.Windows.Forms.TextBox txtSpeedCmd;
+        private System.Windows.Forms.NumericUpDown numSpeedCmd;
         private System.Windows.Forms.Label label4;
-        private System.Windows.Forms.TextBox txtStepsCmd;
+        private System.Windows.Forms.NumericUpDown numStepsCmd;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.NumericUpDown numThreshold;
         private System.Windows.Forms.Label label2;
