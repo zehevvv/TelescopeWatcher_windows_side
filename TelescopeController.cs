@@ -158,6 +158,20 @@ namespace TelescopeWatcher
             }
         }
 
+        /// <summary>Sends a raw command string directly to the connected port or server client.</summary>
+        public void SendRawCommand(string command)
+        {
+            if (!IsConnected()) return;
+            try
+            {
+                WriteCommand(command);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Error sending raw command: {ex.Message}");
+            }
+        }
+
         private bool IsConnected()
         {
             if (isServerMode)

@@ -766,6 +766,19 @@ namespace TelescopeWatcher
             }
         }
 
+        private void StarFollower2ToolStripMenuItem_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var form = new StarFollower2Form(telescopeController, mjpegUrl1, mjpegUrl2);
+                form.Show(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening Star Follower 2: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void SiderealTrackerToolStripMenuItem_Click(object? sender, EventArgs e)
         {
             try
