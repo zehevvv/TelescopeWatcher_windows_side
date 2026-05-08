@@ -63,15 +63,15 @@ namespace TelescopeWatcher
 
             double duration  = (double)numDuration.Value;
             double threshold = (double)numThreshold.Value;
-            string stepsCmd  = $"s={(int)numStepsCmd.Value}";
-            string speedCmd  = $"t={(int)numSpeedCmd.Value}";
+            int baseSteps    = (int)numStepsCmd.Value;
+            int baseSpeed    = (int)numSpeedCmd.Value;
             bool usePrimary  = cbCamera.SelectedIndex == 0;
             string streamUrl = usePrimary ? _primaryStreamUrl : _secondaryStreamUrl;
 
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
-            _ = Task.Run(() => TrackingLoop(duration, threshold, stepsCmd, speedCmd, streamUrl, token), token);
+            _ = Task.Run(() => TrackingLoop(duration, threshold, baseSteps, baseSpeed, streamUrl, token), token);
 
             UpdateStatus(true);
             AppendOutput("Tracking started.");
@@ -122,7 +122,7 @@ namespace TelescopeWatcher
         // ------------------------------------------------------------------
 
         private async Task TrackingLoop(double durationSec, double thresholdPct,
-                                         string stepsCmd, string speedCmd,
+                                         int baseSteps, int baseSpeed,
                                          string streamUrl, CancellationToken ct)
         {
             AppendOutput("Tracking loop started.");
@@ -159,21 +159,27 @@ namespace TelescopeWatcher
                     {
                         AppendOutput($"Star centred (X={offsetXPct:F1}%, Y={offsetYPct:F1}%), no correction.");
                     }
-                    else if (absX >= absY)
-                    {
-                        bool goRight  = dx > 0;
-                        string dirCmd = goRight ? "v=0\nd=0" : "v=0\nd=1";
-                        string name   = goRight ? "RIGHT"    : "LEFT";
-                        AppendOutput($"Correcting {name} (X={offsetXPct:F1}%)");
-                        SendMove(speedCmd, stepsCmd, dirCmd);
-                    }
                     else
                     {
-                        bool goDown   = dy > 0;
-                        string dirCmd = goDown ? "v=1\nd=1" : "v=1\nd=0";
-                        string name   = goDown ? "DOWN"     : "UP";
-                        AppendOutput($"Correcting {name} (Y={offsetYPct:F1}%)");
-                        SendMove(speedCmd, stepsCmd, dirCmd);
+                        double maxOffset = Math.Max(absX, absY);
+                        (string stepsCmd, string speedCmd) = ScaleCommands(baseSteps, baseSpeed, maxOffset);
+
+                        if (absX >= absY)
+                        {
+                            bool goRight  = dx > 0;
+                            string dirCmd = goRight ? "v=0\nd=0" : "v=0\nd=1";
+                            string name   = goRight ? "RIGHT"    : "LEFT";
+                            AppendOutput($"Correcting {name} (X={offsetXPct:F1}%)  steps={stepsCmd}  speed={speedCmd}");
+                            SendMove(speedCmd, stepsCmd, dirCmd);
+                        }
+                        else
+                        {
+                            bool goDown   = dy > 0;
+                            string dirCmd = goDown ? "v=1\nd=1" : "v=1\nd=0";
+                            string name   = goDown ? "DOWN"     : "UP";
+                            AppendOutput($"Correcting {name} (Y={offsetYPct:F1}%)  steps={stepsCmd}  speed={speedCmd}");
+                            SendMove(speedCmd, stepsCmd, dirCmd);
+                        }
                     }
                 }
                 catch (OperationCanceledException)
@@ -202,6 +208,23 @@ namespace TelescopeWatcher
         // ------------------------------------------------------------------
         // Motor command helpers
         // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Returns scaled step and speed commands based on the largest offset.
+        /// >50% -> steps=A*10, speed=B/10
+        /// >25% -> steps=A*5,  speed=B/5
+        /// >5%  -> steps=A*2,  speed=B/2
+        /// else -> steps=A,    speed=B
+        /// </summary>
+        private static (string stepsCmd, string speedCmd) ScaleCommands(int baseSteps, int baseSpeed, double maxOffsetPct)
+        {
+            int steps; int speed;
+            if (maxOffsetPct > 50)       { steps = baseSteps * 10; speed = Math.Max(1, baseSpeed / 10); }
+            else if (maxOffsetPct > 25)  { steps = baseSteps * 5;  speed = Math.Max(1, baseSpeed / 5);  }
+            else if (maxOffsetPct > 5)   { steps = baseSteps * 2;  speed = Math.Max(1, baseSpeed / 2);  }
+            else                         { steps = baseSteps;       speed = baseSpeed;                   }
+            return ($"s={steps}", $"t={speed}");
+        }
 
         /// <summary>
         /// Sends speed -> steps -> direction command sequence.

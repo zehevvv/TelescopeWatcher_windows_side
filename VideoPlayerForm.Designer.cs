@@ -37,6 +37,7 @@ namespace TelescopeWatcher
             this.plateSolverToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.starFollowerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.starFollower2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.starFollower3ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.siderealTrackerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.pictureBox2 = new System.Windows.Forms.PictureBox();
@@ -123,6 +124,7 @@ namespace TelescopeWatcher
             this.plateSolverToolStripMenuItem,
             this.starFollowerToolStripMenuItem,
             this.starFollower2ToolStripMenuItem,
+            this.starFollower3ToolStripMenuItem,
             this.siderealTrackerToolStripMenuItem});
             this.toolsToolStripMenuItem.Name = "toolsToolStripMenuItem";
             this.toolsToolStripMenuItem.Size = new System.Drawing.Size(46, 20);
@@ -148,6 +150,13 @@ namespace TelescopeWatcher
             this.starFollower2ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.starFollower2ToolStripMenuItem.Text = "Star Follower 2";
             this.starFollower2ToolStripMenuItem.Click += new System.EventHandler(this.StarFollower2ToolStripMenuItem_Click);
+            // 
+            // starFollower3ToolStripMenuItem
+            // 
+            this.starFollower3ToolStripMenuItem.Name = "starFollower3ToolStripMenuItem";
+            this.starFollower3ToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.starFollower3ToolStripMenuItem.Text = "Star Follower 3";
+            this.starFollower3ToolStripMenuItem.Click += new System.EventHandler(this.StarFollower3ToolStripMenuItem_Click);
             // 
             // siderealTrackerToolStripMenuItem
             // 
@@ -566,6 +575,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.ToolStripMenuItem plateSolverToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem starFollowerToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem starFollower2ToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem starFollower3ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem siderealTrackerToolStripMenuItem;
     }
 }

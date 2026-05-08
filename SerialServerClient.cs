@@ -19,15 +19,20 @@ namespace TelescopeWatcher
         {
             string encodedCmd = Uri.EscapeDataString(command);
             string url = $"{serverUrl}/motor/write?cmd={encodedCmd}";
-            
+
             System.Diagnostics.Debug.WriteLine($"Sending: {url}");
-            
-            // Fire and forget to avoid blocking UI
-            Task.Run(async () =>
+
+            // Fire and forget: do not wait for the response body.
+            // ResponseHeadersRead returns as soon as the server sends the status line,
+            // and the 500 ms CancellationToken ensures a slow server never holds a
+            // connection-pool slot long enough to stall the next tracking iteration.
+            _ = Task.Run(async () =>
             {
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
                 try
                 {
-                    var response = await commandClient.GetAsync(url);
+                    using var response = await commandClient.GetAsync(
+                        url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
                     System.Diagnostics.Debug.WriteLine($"Response: {response.StatusCode}");
                 }
                 catch (Exception ex)
