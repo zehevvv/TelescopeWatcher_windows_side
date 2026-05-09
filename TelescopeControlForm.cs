@@ -15,6 +15,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Timer commandTimer;
         private System.Windows.Forms.Timer focusTimer;
         private System.Windows.Forms.Timer? videoStatusTimer;
+        private System.Windows.Forms.Timer? cameraListTimer;
         private string currentDirection = "";
         private string currentFocusDirection = "";
         private bool isKeyPressed = false;
@@ -96,6 +97,12 @@ namespace TelescopeWatcher
                 videoStatusTimer.Interval = 3000;
                 videoStatusTimer.Tick += VideoStatusTimer_Tick;
                 videoStatusTimer.Start();
+
+                // Start camera list refresh every 2 seconds
+                cameraListTimer = new System.Windows.Forms.Timer();
+                cameraListTimer.Interval = 2000;
+                cameraListTimer.Tick += (s, e) => _ = LoadCameraListAsync();
+                cameraListTimer.Start();
 
                 // Initial status check
                 _ = CheckVideoServerStatusAsync();
@@ -220,6 +227,14 @@ namespace TelescopeWatcher
 
         private void UpdateCameraComboBoxes(List<CameraInfo> cameras)
         {
+            string? prevPrimary   = (cmbPrimaryCamera.SelectedItem   as CameraInfo)?.CameraId;
+            string? prevSecondary = (cmbSecondaryCamera.SelectedItem as CameraInfo)?.CameraId;
+
+            bool listChanged = cameras.Count != cmbPrimaryCamera.Items.Count ||
+                cameras.Any(c => !cmbPrimaryCamera.Items.Cast<CameraInfo>().Any(e => e.CameraId == c.CameraId));
+
+            if (!listChanged) return;
+
             cmbPrimaryCamera.Items.Clear();
             cmbSecondaryCamera.Items.Clear();
             foreach (var cam in cameras)
@@ -227,9 +242,18 @@ namespace TelescopeWatcher
                 cmbPrimaryCamera.Items.Add(cam);
                 cmbSecondaryCamera.Items.Add(cam);
             }
-            if (cameras.Count > 0) cmbPrimaryCamera.SelectedIndex = 0;
-            if (cameras.Count > 1) cmbSecondaryCamera.SelectedIndex = 1;
+
+            // Restore previous selections, or fall back to defaults
+            int primaryIdx   = cameras.FindIndex(c => c.CameraId == prevPrimary);
+            int secondaryIdx = cameras.FindIndex(c => c.CameraId == prevSecondary);
+
+            if (primaryIdx >= 0) cmbPrimaryCamera.SelectedIndex = primaryIdx;
+            else if (cameras.Count > 0) cmbPrimaryCamera.SelectedIndex = 0;
+
+            if (secondaryIdx >= 0) cmbSecondaryCamera.SelectedIndex = secondaryIdx;
+            else if (cameras.Count > 1) cmbSecondaryCamera.SelectedIndex = 1;
             else if (cameras.Count > 0) cmbSecondaryCamera.SelectedIndex = 0;
+
             AddLogMessage($"Loaded {cameras.Count} camera(s): {string.Join(", ", cameras.Select(c => c.Model))}");
         }
 
@@ -1267,6 +1291,8 @@ namespace TelescopeWatcher
 
             videoStatusTimer?.Stop();
             videoStatusTimer?.Dispose();
+            cameraListTimer?.Stop();
+            cameraListTimer?.Dispose();
             videoHttpClient?.Dispose();
 
             // Close video player window if open
