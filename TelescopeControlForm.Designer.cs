@@ -52,6 +52,7 @@ namespace TelescopeWatcher
             this.cmbPrimaryCamera = new System.Windows.Forms.ComboBox();
             this.lblSecondaryCamera = new System.Windows.Forms.Label();
             this.cmbSecondaryCamera = new System.Windows.Forms.ComboBox();
+            this.chkMainOnly = new System.Windows.Forms.CheckBox();
             this.lblVideoStatus = new System.Windows.Forms.Label();
             this.btnVideoStop = new System.Windows.Forms.Button();
             this.btnVideoStart = new System.Windows.Forms.Button();
@@ -297,13 +298,14 @@ namespace TelescopeWatcher
             this.grpVideoStream.Controls.Add(this.cmbPrimaryCamera);
             this.grpVideoStream.Controls.Add(this.lblSecondaryCamera);
             this.grpVideoStream.Controls.Add(this.cmbSecondaryCamera);
+            this.grpVideoStream.Controls.Add(this.chkMainOnly);
             this.grpVideoStream.Controls.Add(this.lblVideoStatus);
             this.grpVideoStream.Controls.Add(this.btnVideoStop);
             this.grpVideoStream.Controls.Add(this.btnVideoStart);
             this.grpVideoStream.Controls.Add(this.btnRestart);
             this.grpVideoStream.Location = new System.Drawing.Point(390, 210);
             this.grpVideoStream.Name = "grpVideoStream";
-            this.grpVideoStream.Size = new System.Drawing.Size(200, 135);
+            this.grpVideoStream.Size = new System.Drawing.Size(200, 155);
             this.grpVideoStream.TabIndex = 10;
             this.grpVideoStream.TabStop = false;
             this.grpVideoStream.Text = "Video Stream";
@@ -344,6 +346,17 @@ namespace TelescopeWatcher
             this.cmbSecondaryCamera.Size = new System.Drawing.Size(44, 21);
             this.cmbSecondaryCamera.TabIndex = 13;
             // 
+            // chkMainOnly
+            // 
+            this.chkMainOnly.AutoSize = true;
+            this.chkMainOnly.Font = new System.Drawing.Font("Segoe UI", 8F);
+            this.chkMainOnly.Location = new System.Drawing.Point(8, 42);
+            this.chkMainOnly.Name = "chkMainOnly";
+            this.chkMainOnly.Size = new System.Drawing.Size(80, 17);
+            this.chkMainOnly.TabIndex = 14;
+            this.chkMainOnly.Text = "Main only";
+            this.chkMainOnly.CheckedChanged += new System.EventHandler(this.chkMainOnly_CheckedChanged);
+            // 
             // btnVideoStart
             // 
             this.btnVideoStart.BackColor = System.Drawing.Color.Honeydew;
@@ -351,7 +364,7 @@ namespace TelescopeWatcher
             this.btnVideoStart.FlatAppearance.BorderColor = System.Drawing.Color.Green;
             this.btnVideoStart.FlatAppearance.BorderSize = 2;
             this.btnVideoStart.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnVideoStart.Location = new System.Drawing.Point(8, 43);
+            this.btnVideoStart.Location = new System.Drawing.Point(8, 63);
             this.btnVideoStart.Name = "btnVideoStart";
             this.btnVideoStart.Size = new System.Drawing.Size(85, 30);
             this.btnVideoStart.TabIndex = 0;
@@ -366,7 +379,7 @@ namespace TelescopeWatcher
             this.btnVideoStop.FlatAppearance.BorderColor = System.Drawing.Color.IndianRed;
             this.btnVideoStop.FlatAppearance.BorderSize = 2;
             this.btnVideoStop.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnVideoStop.Location = new System.Drawing.Point(103, 43);
+            this.btnVideoStop.Location = new System.Drawing.Point(103, 63);
             this.btnVideoStop.Name = "btnVideoStop";
             this.btnVideoStop.Size = new System.Drawing.Size(85, 30);
             this.btnVideoStop.TabIndex = 1;
@@ -381,7 +394,7 @@ namespace TelescopeWatcher
             this.btnRestart.FlatAppearance.BorderColor = System.Drawing.Color.Orange;
             this.btnRestart.FlatAppearance.BorderSize = 2;
             this.btnRestart.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnRestart.Location = new System.Drawing.Point(55, 79);
+            this.btnRestart.Location = new System.Drawing.Point(55, 99);
             this.btnRestart.Name = "btnRestart";
             this.btnRestart.Size = new System.Drawing.Size(85, 30);
             this.btnRestart.TabIndex = 3;
@@ -394,7 +407,7 @@ namespace TelescopeWatcher
             this.lblVideoStatus.AutoSize = true;
             this.lblVideoStatus.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.lblVideoStatus.ForeColor = System.Drawing.Color.Gray;
-            this.lblVideoStatus.Location = new System.Drawing.Point(8, 116);
+            this.lblVideoStatus.Location = new System.Drawing.Point(8, 136);
             this.lblVideoStatus.Name = "lblVideoStatus";
             this.lblVideoStatus.TabIndex = 2;
             this.lblVideoStatus.Text = "Checking...";
@@ -464,5 +477,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Button btnVideoStop;
         private System.Windows.Forms.Button btnVideoStart;
         private System.Windows.Forms.Button btnRestart;
+        private System.Windows.Forms.CheckBox chkMainOnly;
     }
 }

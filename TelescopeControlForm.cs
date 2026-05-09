@@ -142,6 +142,13 @@ namespace TelescopeWatcher
             }
         }
 
+        private void chkMainOnly_CheckedChanged(object? sender, EventArgs e)
+        {
+            bool mainOnly = chkMainOnly.Checked;
+            cmbSecondaryCamera.Enabled = !mainOnly;
+            lblSecondaryCamera.Enabled = !mainOnly;
+        }
+
         private void OnStepsPerSecondChanged(object? sender, EventArgs e)
         {
             if (this.InvokeRequired)
@@ -273,16 +280,23 @@ namespace TelescopeWatcher
             }
 
             string primaryCam   = SelectedPrimaryCamera;
-            string secondaryCam = SelectedSecondaryCamera;
+            string secondaryCam = chkMainOnly.Checked ? "" : SelectedSecondaryCamera;
 
-            if (string.IsNullOrEmpty(primaryCam) || string.IsNullOrEmpty(secondaryCam))
+            if (string.IsNullOrEmpty(primaryCam))
+            {
+                MessageBox.Show("Please select a primary camera from the list. Cameras may still be loading.",
+                    "Camera Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!chkMainOnly.Checked && string.IsNullOrEmpty(secondaryCam))
             {
                 MessageBox.Show("Please select cameras from the list. Cameras may still be loading.",
                     "Camera Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            if (primaryCam == secondaryCam)
+            if (!chkMainOnly.Checked && primaryCam == secondaryCam)
             {
                 MessageBox.Show("Primary and Secondary cameras cannot be the same.\nPlease select different cameras.",
                     "Camera Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -294,16 +308,20 @@ namespace TelescopeWatcher
                 btnVideoStart.Enabled = false;
                 cmbPrimaryCamera.Enabled = false;
                 cmbSecondaryCamera.Enabled = false;
-                AddLogMessage($"Starting video streams... Primary: {primaryCam}, Secondary: {secondaryCam}");
+                AddLogMessage(chkMainOnly.Checked
+                    ? $"Starting video stream... Primary: {primaryCam}"
+                    : $"Starting video streams... Primary: {primaryCam}, Secondary: {secondaryCam}");
 
                 var uri = new Uri(videoServerUrl);
                 string host = uri.Host;
 
                 var response1 = await videoHttpClient.GetAsync($"{videoServerUrl}/cam/start?camera={primaryCam}");
-                var response2 = await videoHttpClient.GetAsync($"{videoServerUrl}/cam/start?camera={secondaryCam}");
+                HttpResponseMessage? response2 = chkMainOnly.Checked
+                    ? null
+                    : await videoHttpClient.GetAsync($"{videoServerUrl}/cam/start?camera={secondaryCam}");
 
                 bool mainSuccess      = response1.IsSuccessStatusCode;
-                bool secondarySuccess = response2.IsSuccessStatusCode;
+                bool secondarySuccess = response2 == null || response2.IsSuccessStatusCode;
 
                 string primaryStreamUrl   = "";
                 string secondaryStreamUrl = "";
@@ -317,7 +335,7 @@ namespace TelescopeWatcher
                         primaryStreamUrl = $"{resp.Scheme}://{host}:{resp.StreamPort}{resp.StreamPath}";
                 }
 
-                if (secondarySuccess)
+                if (secondarySuccess && response2 != null)
                 {
                     string body = await response2.Content.ReadAsStringAsync();
                     var resp = JsonSerializer.Deserialize<CameraStartResponse>(body,
@@ -483,7 +501,7 @@ namespace TelescopeWatcher
             }
 
             string primaryCam = SelectedPrimaryCamera;
-            string secondaryCam = SelectedSecondaryCamera;
+            string secondaryCam = chkMainOnly.Checked ? "" : SelectedSecondaryCamera;
 
             try
             {
@@ -498,13 +516,16 @@ namespace TelescopeWatcher
                 }
 
                 var response1Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/stop?camera={primaryCam}");
-                var response2Task = videoHttpClient.GetAsync($"{videoServerUrl}/cam/stop?camera={secondaryCam}");
-
                 var response1 = await response1Task;
-                var response2 = await response2Task;
-
                 bool mainSuccess = response1.IsSuccessStatusCode;
-                bool secondarySuccess = response2.IsSuccessStatusCode;
+
+                HttpResponseMessage? response2 = null;
+                bool secondarySuccess = true;
+                if (!chkMainOnly.Checked && !string.IsNullOrEmpty(secondaryCam))
+                {
+                    response2 = await videoHttpClient.GetAsync($"{videoServerUrl}/cam/stop?camera={secondaryCam}");
+                    secondarySuccess = response2.IsSuccessStatusCode;
+                }
 
                 if (mainSuccess && secondarySuccess)
                 {
@@ -523,7 +544,7 @@ namespace TelescopeWatcher
                         AddLogMessage($"{primaryCam.ToUpper()} camera stopped successfully");
                     }
 
-                    if (!secondarySuccess)
+                    if (!secondarySuccess && response2 != null)
                     {
                         string error = await response2.Content.ReadAsStringAsync();
                         AddLogMessage($"Failed to stop {secondaryCam.ToUpper()} camera: {error}");
