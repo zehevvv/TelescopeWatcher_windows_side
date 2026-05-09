@@ -55,6 +55,11 @@ namespace TelescopeWatcher
 
         private Action<string>? logCallback;
 
+        // Auto-focus fields
+        private bool _isAutoFocusing = false;
+        private bool _autoFocusUserCancelled = false;
+        private CancellationTokenSource? _autoFocusCts = null;
+
         public VideoPlayerForm(string serverUrl, string primaryCamera, string primaryStreamUrl,
                                string secondaryCamera, string secondaryStreamUrl,
                                SerialPort? port = null, SerialServerClient? client = null,
@@ -270,12 +275,14 @@ namespace TelescopeWatcher
 
         private void PositionSaveFrameButton()
         {
-            if (telescopeControlPanel == null || btnSaveFrame == null) return;
+            if (telescopeControlPanel == null || btnSaveFrame == null || btnAutoFocus == null) return;
 
-            // Center the save frame button
-            int startX = (telescopeControlPanel.Width - btnSaveFrame.Width) / 2;
+            const int gap = 8;
+            int totalWidth = btnSaveFrame.Width + gap + btnAutoFocus.Width;
+            int startX = (telescopeControlPanel.Width - totalWidth) / 2;
 
             btnSaveFrame.Location = new Point(startX, 35);
+            btnAutoFocus.Location = new Point(startX + btnSaveFrame.Width + gap, 35);
         }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
@@ -809,6 +816,17 @@ namespace TelescopeWatcher
 
         private void VideoPlayerForm_KeyDown(object? sender, KeyEventArgs e)
         {
+            if (_isAutoFocusing)
+            {
+                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
+                    e.KeyCode == Keys.PageUp || e.KeyCode == Keys.PageDown)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+                return;
+            }
+
             if (isKeyPressed || isFocusKeyPressed)
             {
                 if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
@@ -1136,6 +1154,235 @@ namespace TelescopeWatcher
         {
             currentMousePosition = e.Location;
             pictureBox2.Invalidate();
+        }
+
+        private async void BtnAutoFocus_Click(object? sender, EventArgs e)
+        {
+            if (_isAutoFocusing)
+            {
+                _autoFocusUserCancelled = true;
+                _autoFocusCts?.Cancel();
+                return;
+            }
+
+            _isAutoFocusing = true;
+            _autoFocusUserCancelled = false;
+            btnAutoFocus.Text = "Stop Focus";
+            btnAutoFocus.BackColor = System.Drawing.Color.DarkRed;
+
+            _autoFocusCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await RunAutoFocus(_autoFocusCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                string reason = _autoFocusUserCancelled ? "Stopped by user" : "Timed out (30s)";
+                UpdateStatus($"Auto Focus: {reason}", System.Drawing.Color.DimGray);
+                LogMessage($"AutoFocus {reason.ToLower()}");
+                telescopeController.SendFocusStopCommand();
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Auto Focus Error: {ex.Message}", System.Drawing.Color.DarkRed);
+                LogMessage($"AutoFocus error: {ex.Message}");
+                telescopeController.SendFocusStopCommand();
+            }
+            finally
+            {
+                _isAutoFocusing = false;
+                btnAutoFocus.Text = "Auto Focus";
+                btnAutoFocus.BackColor = System.Drawing.Color.DimGray;
+                _autoFocusCts?.Dispose();
+                _autoFocusCts = null;
+            }
+        }
+
+        /// <summary>
+        /// Hill-climbing auto-focus: probe direction ? climb to sharpness peak ? return to best position.
+        /// Uses Laplacian variance of the main camera frame as the sharpness metric.
+        /// </summary>
+        private async Task RunAutoFocus(CancellationToken ct)
+        {
+            const int MOVE_MS   = 300;  // motor run time per step
+            const int SETTLE_MS = 450;  // wait for frame to update after stopping
+            const int MAX_STEPS = 25;   // max climbing steps (timeout handles hard limit)
+            const int MAX_DROPS = 2;    // consecutive sharpness drops before reversing/stopping
+
+            int savedSpeed = telescopeController.FocusSpeed;
+            telescopeController.FocusSpeed = 9; // use max motor speed during autofocus
+
+            try
+            {
+                // --- Baseline ---
+                UpdateStatus("Auto Focus: Measuring baseline...", System.Drawing.Color.DarkOrange);
+                await Task.Delay(SETTLE_MS, ct);
+                double bestSharpness = ComputeSharpness();
+                int netPosition  = 0;  // relative position in move-units from start
+                int bestPosition = 0;
+
+                // --- Phase 1: probe direction ---
+                UpdateStatus("Auto Focus: Probing direction...", System.Drawing.Color.DarkOrange);
+                await MoveFocusFor(MOVE_MS, "INCREASE", ct);
+                netPosition++;
+                await Task.Delay(SETTLE_MS, ct);
+
+                double probeSharpness = ComputeSharpness();
+                string direction;
+                if (probeSharpness >= bestSharpness)
+                {
+                    direction    = "INCREASE";
+                    bestSharpness = probeSharpness;
+                    bestPosition  = netPosition;
+                }
+                else
+                {
+                    // Wrong direction — step back twice to get past start and probe DECREASE
+                    direction = "DECREASE";
+                    for (int i = 0; i < 2 && !ct.IsCancellationRequested; i++)
+                    {
+                        await MoveFocusFor(MOVE_MS, "DECREASE", ct);
+                        netPosition--;
+                        await Task.Delay(SETTLE_MS / 2, ct);
+                    }
+                    double reverseSharpness = ComputeSharpness();
+                    if (reverseSharpness > bestSharpness)
+                    {
+                        bestSharpness = reverseSharpness;
+                        bestPosition  = netPosition;
+                    }
+                }
+
+                LogMessage($"AutoFocus: probing done, direction={direction}, bestSharpness={bestSharpness:F2}");
+
+                // --- Phase 2: Hill climb ---
+                int consecutiveDrops = 0;
+                for (int step = 0; step < MAX_STEPS && !ct.IsCancellationRequested; step++)
+                {
+                    UpdateStatus($"Auto Focus: Climbing step {step + 1}/{MAX_STEPS}  " +
+                                 $"sharpness={bestSharpness:F0}", System.Drawing.Color.DarkOrange);
+
+                    await MoveFocusFor(MOVE_MS, direction, ct);
+                    netPosition += direction == "INCREASE" ? 1 : -1;
+                    await Task.Delay(SETTLE_MS, ct);
+
+                    double s = ComputeSharpness();
+                    LogMessage($"AutoFocus step {step + 1}: sharpness={s:F2}, best={bestSharpness:F2}, pos={netPosition}");
+
+                    if (s > bestSharpness)
+                    {
+                        bestSharpness    = s;
+                        bestPosition     = netPosition;
+                        consecutiveDrops = 0;
+                    }
+                    else
+                    {
+                        consecutiveDrops++;
+                        if (consecutiveDrops >= MAX_DROPS)
+                            break;
+                    }
+                }
+
+                // --- Phase 3: Return to best position ---
+                int stepsBack = netPosition - bestPosition;
+                if (stepsBack != 0 && !ct.IsCancellationRequested)
+                {
+                    string backDir = stepsBack > 0 ? "DECREASE" : "INCREASE";
+                    int absSteps   = Math.Abs(stepsBack);
+                    UpdateStatus($"Auto Focus: Returning to best ({absSteps} steps)...",
+                                 System.Drawing.Color.DarkOrange);
+                    for (int i = 0; i < absSteps && !ct.IsCancellationRequested; i++)
+                    {
+                        await MoveFocusFor(MOVE_MS, backDir, ct);
+                        await Task.Delay(SETTLE_MS / 3, ct);
+                    }
+                }
+
+                UpdateStatus($"Auto Focus: Complete  sharpness={bestSharpness:F0}",
+                             System.Drawing.Color.DarkGreen);
+                LogMessage($"AutoFocus complete. Best sharpness: {bestSharpness:F2}");
+            }
+            finally
+            {
+                telescopeController.FocusSpeed = savedSpeed;
+                telescopeController.SendFocusStopCommand();
+            }
+        }
+
+        /// <summary>Runs the focus motor in <paramref name="direction"/> for <paramref name="durationMs"/> ms, then stops.</summary>
+        private async Task MoveFocusFor(int durationMs, string direction, CancellationToken ct)
+        {
+            telescopeController.SendFocusCommand(direction);
+            int elapsed = 0;
+            while (elapsed < durationMs)
+            {
+                await Task.Delay(100, ct); // throws OperationCanceledException on cancel
+                elapsed += 100;
+                telescopeController.SendFocusStepsCommand();
+            }
+            telescopeController.SendFocusStopCommand();
+        }
+
+        /// <summary>
+        /// Computes the Laplacian variance of the current main camera frame as a sharpness score.
+        /// Higher value = sharper image.
+        /// </summary>
+        private double ComputeSharpness()
+        {
+            Image? image = pictureBox1.Image;
+            if (image == null) return 0;
+
+            try
+            {
+                // Downsample to fixed size to normalise cost and resolution differences
+                const int W = 320;
+                int H = Math.Max(1, W * image.Height / image.Width);
+
+                using var bmp = new Bitmap(image, new Size(W, H));
+                var rect = new Rectangle(0, 0, W, H);
+                var bmpData = bmp.LockBits(rect,
+                    System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+                int stride = Math.Abs(bmpData.Stride);
+                byte[] raw = new byte[stride * H];
+                System.Runtime.InteropServices.Marshal.Copy(bmpData.Scan0, raw, 0, raw.Length);
+                bmp.UnlockBits(bmpData);
+
+                // Build grayscale plane
+                var gray = new double[W * H];
+                for (int y = 0; y < H; y++)
+                    for (int x = 0; x < W; x++)
+                    {
+                        int o = y * stride + x * 4;
+                        gray[y * W + x] = 0.299 * raw[o + 2] + 0.587 * raw[o + 1] + 0.114 * raw[o];
+                    }
+
+                // Laplacian variance
+                double sum = 0, sum2 = 0;
+                int count = 0;
+                for (int y = 1; y < H - 1; y++)
+                    for (int x = 1; x < W - 1; x++)
+                    {
+                        double lap = -4 * gray[y * W + x]
+                                     + gray[(y - 1) * W + x]
+                                     + gray[(y + 1) * W + x]
+                                     + gray[y * W + (x - 1)]
+                                     + gray[y * W + (x + 1)];
+                        sum  += lap;
+                        sum2 += lap * lap;
+                        count++;
+                    }
+
+                double mean     = sum  / count;
+                double variance = sum2 / count - mean * mean;
+                return variance;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ComputeSharpness error: {ex.Message}");
+                return 0;
+            }
         }
 
         private void PictureBox2_MouseClick(object? sender, MouseEventArgs e)

@@ -66,6 +66,7 @@ namespace TelescopeWatcher
             this.lblFocusSpeed = new System.Windows.Forms.Label();
             this.lblFocusSpeedValue = new System.Windows.Forms.Label();
             this.btnSaveFrame = new System.Windows.Forms.Button();
+            this.btnAutoFocus = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             this.videoPanel.SuspendLayout();
@@ -415,6 +416,7 @@ namespace TelescopeWatcher
             this.telescopeControlPanel.Controls.Add(this.trackBarFocusSpeed);
             this.telescopeControlPanel.Controls.Add(this.lblFocusSpeedValue);
             this.telescopeControlPanel.Controls.Add(this.btnSaveFrame);
+            this.telescopeControlPanel.Controls.Add(this.btnAutoFocus);
             this.telescopeControlPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.telescopeControlPanel.Height = 80;
             this.telescopeControlPanel.Name = "telescopeControlPanel";
@@ -495,6 +497,21 @@ namespace TelescopeWatcher
             this.btnSaveFrame.UseVisualStyleBackColor = false;
             this.btnSaveFrame.Click += new System.EventHandler(this.BtnSaveFrame_Click);
             // 
+            // btnAutoFocus
+            // 
+            this.btnAutoFocus.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+            this.btnAutoFocus.AutoSize = true;
+            this.btnAutoFocus.BackColor = System.Drawing.Color.DimGray;
+            this.btnAutoFocus.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnAutoFocus.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnAutoFocus.ForeColor = System.Drawing.Color.White;
+            this.btnAutoFocus.Location = new System.Drawing.Point(620, 35); // Initial pos, will be repositioned
+            this.btnAutoFocus.Name = "btnAutoFocus";
+            this.btnAutoFocus.Padding = new System.Windows.Forms.Padding(10, 2, 10, 2);
+            this.btnAutoFocus.Text = "Auto Focus";
+            this.btnAutoFocus.UseVisualStyleBackColor = false;
+            this.btnAutoFocus.Click += new System.EventHandler(this.BtnAutoFocus_Click);
+            // 
             // VideoPlayerForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -566,6 +583,7 @@ namespace TelescopeWatcher
         private System.Windows.Forms.Label lblFocusSpeed;
         private System.Windows.Forms.Label lblFocusSpeedValue;
         private System.Windows.Forms.Button btnSaveFrame;
+        private System.Windows.Forms.Button btnAutoFocus;
         private System.Windows.Forms.MenuStrip menuStrip1;
         private System.Windows.Forms.ToolStripMenuItem cameraSettingsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mainCameraToolStripMenuItem;
