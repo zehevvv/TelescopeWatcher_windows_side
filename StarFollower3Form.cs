@@ -206,7 +206,7 @@ namespace TelescopeWatcher
                     var fetchSw = System.Diagnostics.Stopwatch.StartNew();
                     using var raw = await FetchFrameAsync(streamUrl);
                     fetchSw.Stop();
-                    AppendOutput($"[TIMING] FetchFrame={fetchSw.ElapsedMilliseconds}ms");
+                    //AppendOutput($"[TIMING] FetchFrame={fetchSw.ElapsedMilliseconds}ms");
                     if (raw == null)
                     {
                         AppendOutput("Warning: could not capture frame, retrying...");
@@ -225,14 +225,14 @@ namespace TelescopeWatcher
                         continue;
                     }
 
-                    (int dx, int dy)? offset;
+                    (int dx, int dy, float mean)? offset;
                     using (var mask = BuildStarMask(raw, stars))
                     {
                         // _referenceMask is read-only after capture so no lock needed
                         offset = PhaseCorrelation.EstimateOffset(_referenceMask!, mask, scale: 0.25f);
                     }
                     procSw.Stop();
-                    AppendOutput($"[TIMING] Processing={procSw.ElapsedMilliseconds}ms");
+                    //AppendOutput($"[TIMING] Processing={procSw.ElapsedMilliseconds}ms");                    
 
                     if (offset == null)
                     {
@@ -241,6 +241,8 @@ namespace TelescopeWatcher
                         continue;
                     }
 
+                    AppendOutput($"mean {offset.Value.mean}");
+
                     double offsetXPct = offset.Value.dx / (double)w * 100.0;
                     double offsetYPct = offset.Value.dy / (double)h * 100.0;
                     double absX       = Math.Abs(offsetXPct);
@@ -248,7 +250,7 @@ namespace TelescopeWatcher
 
                     if (absX <= thresholdPct && absY <= thresholdPct)
                     {
-                        AppendOutput($"Centred (dx={offset.Value.dx}px X={offsetXPct:F1}%, dy={offset.Value.dy}px Y={offsetYPct:F1}%), no correction.");
+                        AppendOutput($"Centred (X={offsetXPct:F1}%, Y={offsetYPct:F1}%), no correction.");
                     }
                     else
                     {
@@ -257,19 +259,19 @@ namespace TelescopeWatcher
 
                         if (absX >= absY)
                         {
-                            // Stars drifted RIGHT (dx>0) → same correction direction as SF2 star-right-of-centre
+                            // Stars drifted RIGHT (dx>0) → image is flipped, so correct LEFT
                             bool goRight  = offset.Value.dx > 0;
-                            string dirCmd = goRight ? "v=0\nd=1" : "v=0\nd=0";
-                            string name   = goRight ? "RIGHT"    : "LEFT";
-                            AppendOutput($"Correcting {name} (dx={offset.Value.dx}px X={offsetXPct:F1}%)  steps={stepsCmd}  speed={speedCmd}");
+                            string dirCmd = goRight ? "v=0\nd=0" : "v=0\nd=1";
+                            string name   = goRight ? "LEFT"     : "RIGHT";
+                            AppendOutput($"Correcting {name} (X={offsetXPct:F1}%, Y={offsetYPct:F1}%)");
                             SendMove(speedCmd, stepsCmd, dirCmd);
                         }
                         else
                         {
                             bool goDown   = offset.Value.dy > 0;
-                            string dirCmd = goDown ? "v=1\nd=0" : "v=1\nd=1";
-                            string name   = goDown ? "DOWN"     : "UP";
-                            AppendOutput($"Correcting {name} (dy={offset.Value.dy}px Y={offsetYPct:F1}%)  steps={stepsCmd}  speed={speedCmd}");
+                            string dirCmd = goDown ? "v=1\nd=1" : "v=1\nd=0";
+                            string name   = goDown ? "UP"       : "DOWN";
+                            AppendOutput($"Correcting {name} (X={offsetXPct:F1}%, Y={offsetYPct:F1}%)");
                             SendMove(speedCmd, stepsCmd, dirCmd);
                         }
                     }
@@ -284,7 +286,7 @@ namespace TelescopeWatcher
                 }
 
                 _loopSw.Stop();
-                AppendOutput($"[TIMING] CycleTotal={_loopSw.ElapsedMilliseconds}ms  (excl. delay)");
+                //AppendOutput($"[TIMING] CycleTotal={_loopSw.ElapsedMilliseconds}ms  (excl. delay)");
 
                 try
                 {

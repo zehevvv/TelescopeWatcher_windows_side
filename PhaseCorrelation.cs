@@ -27,7 +27,7 @@ namespace TelescopeWatcher
         /// </summary>
         /// <param name="scale">Downsample factor applied before FFT (e.g. 0.25 = quarter resolution).
         /// Reduces FFT size and computation time; the returned offset is automatically scaled back up.</param>
-        public static (int dx, int dy)? EstimateOffset(Bitmap reference, Bitmap current, float scale = 1.0f)
+        public static (int dx, int dy, float mean)? EstimateOffset(Bitmap reference, Bitmap current, float scale = 1.0f)
         {
             int w = reference.Width, h = reference.Height;
             if (current.Width != w || current.Height != h) return null;
@@ -70,8 +70,16 @@ namespace TelescopeWatcher
 
             float peak = float.MinValue;
             int pi = 0;
+            float sumAbs = 0f;
             for (int i = 0; i < pw * ph; i++)
+            {
+                sumAbs += MathF.Abs(corr[i].re);
                 if (corr[i].re > peak) { peak = corr[i].re; pi = i; }
+            }
+
+            // Reject spurious peaks: peak must be at least 5x the mean absolute value.
+            float mean = sumAbs / (pw * ph);            
+            if (mean < 1e-9f || peak / mean < 5f) return null;
 
             int px = pi % pw;
             int py = pi / pw;
@@ -87,7 +95,7 @@ namespace TelescopeWatcher
                 py = (int)MathF.Round(py / scale);
             }
 
-            return (px, py);
+            return (px, py, mean);
         }
 
         // ------------------------------------------------------------------
