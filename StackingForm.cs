@@ -163,7 +163,7 @@ namespace TelescopeWatcher
         {
             try
             {
-                foreach (var (image, path) in _saveQueue!.GetConsumingEnumerable(_saveCts!.Token))
+                foreach (var (image, path) in _saveQueue!.GetConsumingEnumerable())
                 {
                     try { image.Save(path, ImageFormat.Png); }
                     catch { }
@@ -183,9 +183,8 @@ namespace TelescopeWatcher
             _videoPlayerForm.MainMjpegClient.FrameReceived -= OnMjpegFrameReceived;
             _uiTimer.Stop();
 
-            // Drain and shut down save queue
+            // Signal no more items; worker will drain remaining frames before exiting
             _saveQueue?.CompleteAdding();
-            _saveCts?.Cancel();
 
             btnStop.Enabled = false;
             btnStart.Enabled = true;
@@ -193,12 +192,22 @@ namespace TelescopeWatcher
             radioFrameBased.Enabled = true;
             UpdateModeUI();
 
-            double elapsed = (DateTime.Now - _stackingStartTime).TotalSeconds;
             int saved = _capturedFrames;
-            lblProgress.Text = $"Done: {saved} frames in {elapsed:F1}s → {_saveFolder}";
+            double elapsed = (DateTime.Now - _stackingStartTime).TotalSeconds;
 
-            MessageBox.Show($"Stacking complete!\n{saved} frames saved to:\n{_saveFolder}",
-                "Stacking Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // Wait for all queued frames to be written, then notify
+            Task.Run(async () =>
+            {
+                if (_saveWorker != null)
+                    await _saveWorker.ConfigureAwait(false);
+
+                this.BeginInvoke(new Action(() =>
+                {
+                    lblProgress.Text = $"Done: {saved} frames in {elapsed:F1}s → {_saveFolder}";
+                    MessageBox.Show($"Stacking complete!\n{saved} frames saved to:\n{_saveFolder}",
+                        "Stacking Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }));
+            });
         }
 
         private void UiTimer_Tick(object? sender, EventArgs e)
