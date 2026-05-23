@@ -23,4 +23,10 @@
     <Compile Remove="BenchmarkSuite1\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include=".github\copilot-instructions.md" />
+    <None Include=".github\skills\telescopeconfiguration\SKILL.md" />
+    <None Include=".github\skills\reasearch_telescope_skill\SKILL.md" />
+  </ItemGroup>
+
 </Project>
