@@ -55,6 +55,11 @@ namespace TelescopeWatcher
 
         private Action<string>? logCallback;
 
+        // Stacking support
+        public double CurrentFps1 { get; private set; } = 0;
+        public event EventHandler<Image>? StackingFrameAvailable;
+        public MjpegStreamClient MainMjpegClient => mjpegClient1;
+
         // Auto-focus fields
         private bool _isAutoFocusing = false;
         private bool _autoFocusUserCancelled = false;
@@ -466,10 +471,11 @@ namespace TelescopeWatcher
                 var elapsed = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - lastFpsUpdate1;
                 if (elapsed >= 1000)
                 {
+                    CurrentFps1 = frameCount1;
                     UpdateFrameInfo(totalFrameCount1, frameCount1, 1);
                     lastFpsUpdate1 += 1000;
                     frameCount1 = 0;
-                }                                
+                }
             }
             catch (Exception ex)
             {
@@ -809,6 +815,19 @@ namespace TelescopeWatcher
             catch (Exception ex)
             {
                 MessageBox.Show($"Error opening sidereal tracker: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void StackingToolStripMenuItem_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                var form = new StackingForm(this);
+                form.Show(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening stacking: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

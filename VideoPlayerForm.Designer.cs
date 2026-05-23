@@ -39,6 +39,7 @@ namespace TelescopeWatcher
             this.starFollower2ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.starFollower3ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.siderealTrackerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.stackingToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.pictureBox2 = new System.Windows.Forms.PictureBox();
             this.videoPanel = new System.Windows.Forms.Panel();
@@ -126,7 +127,8 @@ namespace TelescopeWatcher
             this.starFollowerToolStripMenuItem,
             this.starFollower2ToolStripMenuItem,
             this.starFollower3ToolStripMenuItem,
-            this.siderealTrackerToolStripMenuItem});
+            this.siderealTrackerToolStripMenuItem,
+            this.stackingToolStripMenuItem});
             this.toolsToolStripMenuItem.Name = "toolsToolStripMenuItem";
             this.toolsToolStripMenuItem.Size = new System.Drawing.Size(46, 20);
             this.toolsToolStripMenuItem.Text = "Tools";
@@ -165,6 +167,13 @@ namespace TelescopeWatcher
             this.siderealTrackerToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.siderealTrackerToolStripMenuItem.Text = "Sidereal Tracker";
             this.siderealTrackerToolStripMenuItem.Click += new System.EventHandler(this.SiderealTrackerToolStripMenuItem_Click);
+            // 
+            // stackingToolStripMenuItem
+            // 
+            this.stackingToolStripMenuItem.Name = "stackingToolStripMenuItem";
+            this.stackingToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.stackingToolStripMenuItem.Text = "Stacking";
+            this.stackingToolStripMenuItem.Click += new System.EventHandler(this.StackingToolStripMenuItem_Click);
             // 
             // pictureBox1
             // 
@@ -595,5 +604,6 @@ namespace TelescopeWatcher
         private System.Windows.Forms.ToolStripMenuItem starFollower2ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem starFollower3ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem siderealTrackerToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem stackingToolStripMenuItem;
     }
 }
